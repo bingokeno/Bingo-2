@@ -4820,10 +4820,10 @@ window.AudioCaller=AudioCaller;
           .order('created_at',{ascending:false}).limit(1).maybeSingle();
         if(!round){state.pollInFlight=false;return;}
         if(!state.round||state.round.id!==round.id){
-          state.round=round;state.called=new Set();state.latestNumber=null;
-          state.lastSyncedRoundId=null;await loadRound();
+          state.lastSyncedRoundId=null;
           scheduleResync('poll-round-changed');
-          state.pollInFlight=false;return;
+          state.pollInFlight=false;
+          return;
         }
         if(round.status!=='playing'){state.pollInFlight=false;return;}
         const {data:calls}=await sb.from('calls')
@@ -4841,9 +4841,7 @@ window.AudioCaller=AudioCaller;
           state.lastCallReceivedAt=Date.now();
           renderCalled();
           if($('autoDaub').checked)autoDaubAll();else renderMyCards();
-          const latest=calls[calls.length-1].number;
-          playChime(); AudioCaller.playNumber(latest);
-          // 3D popup disabled — sphere handles visuals
+          // Realtime applyCall() already handles audio.
         }
       }catch(e){console.error('[poll] error:',e);}
       finally{state.pollInFlight=false;}
