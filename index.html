@@ -1430,7 +1430,8 @@
   width:100%; height:100%;
   border-radius:50%;
   transform-style: preserve-3d;
-  animation: sphereSpin 18s linear infinite;
+  animation:none;
+  transform:rotateX(-8deg) rotateY(0deg);
   background:
     radial-gradient(circle at 35% 30%,
       rgba(147,197,253,.10) 0%,
@@ -1443,8 +1444,8 @@
     0 24px 60px rgba(0,0,0,.7);
 }
 @keyframes sphereSpin{
-  from{ transform: rotateX(-8deg) rotateY(0deg); }
-  to  { transform: rotateX(-8deg) rotateY(360deg); }
+  from{ transform:rotateX(-8deg) rotateY(0deg); }
+  to{ transform:rotateX(-8deg) rotateY(0deg); }
 }
 
 /* NEW — real 3D lat/lon wireframe */
@@ -5205,8 +5206,8 @@ window.AudioCaller=AudioCaller;
      Pure visual layer. The actual drawn number always comes from state/backend. */
   const SphereEngine=(function(){
     const reducedMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const MINI_BALL_COUNT=60, MINI_BALLS=[];
-    let raf=null,lastT=0,stageEl,sphereEl,innerEl,releaseEl,trailEl,statusEl;
+    const MINI_BALL_COUNT=36, MINI_BALLS=[];
+    let raf=null,lastT=0,stageEl,sphereEl,innerEl,releaseEl,trailEl,statusEl,frameSkip=0;
     let sequenceRunning=false,queuedNumber=null,initialized=false,activeRoundId=null;
     const letterFor=n=>n<=15?'B':n<=30?'I':n<=45?'N':n<=60?'G':'O';
     const letterClass=n=>'c-'+letterFor(n);
@@ -5247,13 +5248,23 @@ window.AudioCaller=AudioCaller;
     }
     function startLoop(){
       if(raf)return;
-      lastT=performance.now();const frame=t=>{const dt=Math.min(.05,(t-lastT)/1000);lastT=t;step(dt);raf=requestAnimationFrame(frame)};raf=requestAnimationFrame(frame);
+      lastT=performance.now();
+      frameSkip=0;
+      const frame=t=>{
+        // Cap the visual physics loop at ~30 FPS on mobile to reduce CPU/GPU heat.
+        const elapsed=t-lastT;
+        if(elapsed>=32){
+          const dt=Math.min(.05,elapsed/1000);
+          lastT=t;
+          step(dt);
+        }
+        raf=requestAnimationFrame(frame);
+      };
+      raf=requestAnimationFrame(frame);
     }
     function stopLoop(){if(raf){cancelAnimationFrame(raf);raf=null}}
     function step(dt){
       const R = 0.85;
-      const now = performance.now() / 1000;
-
       for (const b of MINI_BALLS){
         // integrate
         b.x += b.vx * dt;
@@ -5273,40 +5284,41 @@ window.AudioCaller=AudioCaller;
         }
       }
 
-      // ball-vs-ball (single pass — O(n²) is fine for 60)
-      for (let i = 0; i < MINI_BALLS.length; i++){
-        for (let j = i+1; j < MINI_BALLS.length; j++){
-          const a = MINI_BALLS[i], b = MINI_BALLS[j];
-          const dx = b.x-a.x, dy = b.y-a.y, dz = b.z-a.z;
-          const d2 = dx*dx + dy*dy + dz*dz;
-          const minD = a.r + b.r;
-          if (d2 < minD*minD && d2 > 1e-6){
-            const d = Math.sqrt(d2);
-            const nx = dx/d, ny = dy/d, nz = dz/d;
-            const push = (minD - d) * 0.5;
-            a.x -= nx*push; a.y -= ny*push; a.z -= nz*push;
-            b.x += nx*push; b.y += ny*push; b.z += nz*push;
-            const vn = (b.vx-a.vx)*nx + (b.vy-a.vy)*ny + (b.vz-a.vz)*nz;
-            if (vn < 0){
-              a.vx += nx*vn; a.vy += ny*vn; a.vz += nz*vn;
-              b.vx -= nx*vn; b.vy -= ny*vn; b.vz -= nz*vn;
+      // Ball-vs-ball collision is the most expensive part of the visual simulation.
+      // Run it every other visual frame; the balls still move continuously.
+      frameSkip++;
+      if((frameSkip & 1)===0){
+        for (let i = 0; i < MINI_BALLS.length; i++){
+          for (let j = i+1; j < MINI_BALLS.length; j++){
+            const a = MINI_BALLS[i], b = MINI_BALLS[j];
+            const dx = b.x-a.x, dy = b.y-a.y, dz = b.z-a.z;
+            const d2 = dx*dx + dy*dy + dz*dz;
+            const minD = a.r + b.r;
+            if (d2 < minD*minD && d2 > 1e-6){
+              const d = Math.sqrt(d2);
+              const nx = dx/d, ny = dy/d, nz = dz/d;
+              const push = (minD - d) * 0.5;
+              a.x -= nx*push; a.y -= ny*push; a.z -= nz*push;
+              b.x += nx*push; b.y += ny*push; b.z += nz*push;
+              const vn = (b.vx-a.vx)*nx + (b.vy-a.vy)*ny + (b.vz-a.vz)*nz;
+              if (vn < 0){
+                a.vx += nx*vn; a.vy += ny*vn; a.vz += nz*vn;
+                b.vx -= nx*vn; b.vy -= ny*vn; b.vz -= nz*vn;
+              }
             }
           }
         }
       }
 
-      // Now project to screen with a REAL rotation angle we control
-      // This is what makes "the exact angle" visible.
-      const angleY = now * 0.35;               // rad/s — same as CSS spin
-      const cosA = Math.cos(angleY), sinA = Math.sin(angleY);
+      // Keep the sphere completely stationary. Only the balls move and collide.
+      // Apply one fixed tilt for the glass perspective; there is no continuous sphere rotation.
       const tiltX = -0.14;                     // ~-8deg
       const cosT = Math.cos(tiltX), sinT = Math.sin(tiltX);
 
       for (const b of MINI_BALLS){
-        // rotate around Y
-        const rx = b.x*cosA + b.z*sinA;
-        const rz = -b.x*sinA + b.z*cosA;
-        // rotate around X (tilt)
+        const rx = b.x;
+        const rz = b.z;
+        // fixed X tilt only
         const ry = b.y*cosT - rz*sinT;
         const rz2 = b.y*sinT + rz*cosT;
 
@@ -5352,7 +5364,7 @@ window.AudioCaller=AudioCaller;
 
   (function spawnParticles(){
     const el=$('particlesBg');if(!el)return;
-    for(let i=0;i<24;i++){
+    for(let i=0;i<12;i++){
       const p=document.createElement('div');
       p.className='p';
       p.style.left=(Math.random()*100)+'%';
