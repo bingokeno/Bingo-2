@@ -1508,6 +1508,42 @@
 .bingo-board .num.landing{animation:landingPulse 1.6s cubic-bezier(.22,1.4,.36,1);z-index:3}@keyframes landingPulse{0%{transform:scale(1)}18%{transform:scale(1.28);box-shadow:0 0 26px rgba(251,191,36,1),0 0 48px rgba(251,191,36,.7)}38%{transform:scale(.94)}58%{transform:scale(1.06)}100%{transform:scale(1)}}
 @media(prefers-reduced-motion:reduce){.sphere,.sphere.spin-fast,.sphere.spin-turbo,.sphere.shake{animation-duration:60s!important}.sphere-ring{animation:none}.release-ball .rb-face::after{animation:none}.bingo-board .num.landing{animation:none!important;box-shadow:0 0 16px rgba(251,191,36,.85)!important}}
 @media(max-width:520px){.sphere-status{font-size:.58rem;padding:5px 11px;margin-top:10px}.release-ball{width:64px;height:64px}.release-ball .rb-face span:first-child{font-size:.6rem}.release-ball .rb-face span:last-child{font-size:1.32rem}}
+
+/* ═══════ CYLINDER BINGO MACHINE — presentation only ═══════ */
+.cylinder-live-layout{display:grid;grid-template-columns:minmax(0,44%) minmax(0,56%);gap:8px;align-items:stretch;width:100%;min-height:0;margin-top:6px}
+.cylinder-column,.cylinder-board-column{min-width:0;display:flex;flex-direction:column}
+.cylinder-machine-title,.cylinder-board-title{height:30px;display:flex;align-items:center;justify-content:center;gap:7px;font-family:Poppins,sans-serif;font-size:.68rem;font-weight:1000;letter-spacing:1.2px;color:var(--gold);text-shadow:0 0 12px rgba(251,191,36,.35);white-space:nowrap}
+.cm-light{width:6px;height:6px;border-radius:50%;background:var(--danger);box-shadow:0 0 9px var(--danger);animation:casinoPulse 1.4s infinite}
+.cylinder-board-title{color:var(--accent);font-size:.72rem}
+.cylinder-board-title .brand-mark{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:6px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#201000;box-shadow:0 0 12px rgba(251,191,36,.3);font-weight:1000}
+.cylinder-stage{flex:1;min-height:250px;padding:2px 0 5px;margin:0;justify-content:flex-start}
+.cylinder-wrap{width:min(100%,210px);height:clamp(220px,46vh,420px);aspect-ratio:auto;perspective:1000px}
+.cylinder-machine{width:72%;height:92%;border-radius:24%/9%;transform:rotateX(-3deg) rotateY(0deg);background:linear-gradient(90deg,rgba(2,6,23,.96) 0%,rgba(30,41,59,.85) 12%,rgba(8,47,73,.42) 24%,rgba(14,116,144,.25) 50%,rgba(8,47,73,.42) 76%,rgba(30,41,59,.85) 88%,rgba(2,6,23,.96) 100%);border:2px solid rgba(125,211,252,.5);box-shadow:inset 12px 0 22px rgba(255,255,255,.1),inset -16px 0 28px rgba(0,0,0,.72),0 0 32px rgba(6,182,212,.28),0 20px 40px rgba(0,0,0,.7);overflow:hidden}
+.cylinder-machine:before,.cylinder-machine:after{content:"";position:absolute;top:3%;bottom:3%;width:18px;border-radius:50%;z-index:7;pointer-events:none;background:linear-gradient(90deg,#020617,#94a3b8 45%,#111827);box-shadow:0 0 10px rgba(148,163,184,.28)}
+.cylinder-machine:before{left:-9px}.cylinder-machine:after{right:-9px}
+.cylinder-top-cap{position:absolute;left:14%;right:14%;top:-5%;height:12%;border-radius:50%;background:linear-gradient(180deg,#e2e8f0,#64748b 35%,#0f172a 75%);box-shadow:0 4px 12px rgba(0,0,0,.7);z-index:8}
+.cylinder-window{position:absolute;inset:7% 10%;border-radius:18%/7%;border:1px solid rgba(186,230,253,.3);background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(6,182,212,.08),rgba(255,255,255,.03));box-shadow:inset 0 0 25px rgba(6,182,212,.12);pointer-events:none;z-index:2}
+.cylinder-inner-frame{position:absolute;inset:10% 12%;overflow:hidden;border-radius:17%/7%;z-index:3;transform:translateZ(4px);background:radial-gradient(ellipse at 50% 48%,rgba(14,116,144,.16),rgba(2,6,23,.55) 72%)}
+.cylinder-machine .sphere-inner{inset:-8%;border-radius:18%/8%;overflow:hidden}
+.cylinder-machine .sphere-inner .mini{width:16%;font-size:clamp(.38rem,1.7vw,.62rem);box-shadow:inset -3px -4px 6px rgba(0,0,0,.45),inset 3px 3px 6px rgba(255,255,255,.7),0 2px 7px rgba(0,0,0,.45),0 0 7px rgba(251,191,36,.4)}
+.cylinder-glass{position:absolute;inset:0;border-radius:24%/9%;z-index:6;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,.18),transparent 14%,transparent 72%,rgba(255,255,255,.08)),linear-gradient(180deg,rgba(255,255,255,.22),transparent 12%,transparent 78%,rgba(6,182,212,.12));mix-blend-mode:screen}
+.cylinder-rail{position:absolute;top:7%;bottom:7%;width:3px;border-radius:99px;background:linear-gradient(180deg,#f8fafc,#64748b 35%,#0f172a 70%,#e2e8f0);z-index:9;box-shadow:0 0 7px rgba(255,255,255,.35)}
+.rail-left{left:9%}.rail-right{right:9%}
+.cylinder-rings{position:absolute;left:3%;right:3%;height:7%;border:2px solid rgba(251,191,36,.55);border-radius:50%;z-index:9;box-shadow:0 0 12px rgba(251,191,36,.25),inset 0 0 8px rgba(251,191,36,.2)}
+.ring-top{top:4%}.ring-bottom{bottom:4%}
+.cylinder-base{bottom:-1%;width:82%;height:8%;border-radius:50%;background:linear-gradient(180deg,#334155,#020617);box-shadow:0 8px 18px rgba(0,0,0,.8);z-index:1}
+.cylinder-foot{position:absolute;bottom:-18px;width:25%;height:24px;border-radius:4px 4px 9px 9px;background:linear-gradient(90deg,#020617,#64748b,#020617);box-shadow:0 8px 12px rgba(0,0,0,.65)}
+.left-foot{left:8%}.right-foot{right:8%}
+.cylinder-shadow{bottom:-16%;width:90%;height:7%}
+.cylinder-board-column{background:rgba(2,6,23,.3);border:1px solid rgba(148,163,184,.13);border-radius:12px;padding:5px;min-height:0}
+.cylinder-latest{display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 9px;margin-bottom:5px;border-radius:9px;background:linear-gradient(135deg,rgba(15,23,42,.9),rgba(8,47,73,.55));border:1px solid rgba(6,182,212,.22)}
+.cylinder-latest span{font-size:.55rem;font-weight:900;color:var(--muted);letter-spacing:1px}.cylinder-latest strong{font-size:1.35rem;line-height:1;color:var(--gold);text-shadow:0 0 12px rgba(251,191,36,.35)}
+.cylinder-board-actions{display:flex;gap:5px;margin-bottom:5px}.cylinder-board-actions button{flex:1;margin:0!important;padding:6px 4px!important;font-size:.58rem!important}
+.cylinder-board-wrap{flex:1;min-height:0;overflow:auto;display:flex}.cylinder-board-wrap .bingo-board{width:100%;height:100%;min-height:0}
+@media(max-width:700px){.cylinder-live-layout{grid-template-columns:44% 56%;gap:5px}.cylinder-machine-title,.cylinder-board-title{font-size:.52rem;letter-spacing:.7px;height:25px}.cylinder-wrap{width:100%;height:clamp(210px,48vh,360px)}.cylinder-board-column{padding:3px}.cylinder-latest{height:31px;padding:0 6px}.cylinder-latest strong{font-size:1.1rem}.cylinder-board-actions button{font-size:.48rem!important}.cylinder-stage .sphere-status{font-size:.48rem;padding:4px 7px;gap:4px}.cylinder-stage .sphere-status .ss-dot{width:5px;height:5px}}
+@media(max-height:650px) and (max-width:700px){.cylinder-wrap{height:210px}.cylinder-stage{min-height:225px}}
+@media(min-width:900px){.cylinder-wrap{height:min(58vh,500px);width:min(100%,300px)}}
+
 </style>
 </head>
 <body>
@@ -1701,38 +1737,47 @@
           </div>
           <div class="pattern-grid" id="patternGridMini"></div>
         </div>
-        <!-- ═══════ BINGO LOTTERY SPHERE ═══════ -->
-        <div id="sphereStage" class="sphere-stage">
-          <div class="sphere-wrap">
-            <div class="sphere" id="sphereBody">
-              <!-- 3 latitude rings -->
-              <div class="lat" style="--y: 40deg; --s:.75"></div>
-              <div class="lat eq" style="--y: 0deg; --s:1"></div>
-              <div class="lat" style="--y:-40deg; --s:.75"></div>
-              <!-- 3 longitude rings -->
-              <div class="lon prime" style="--r: 0deg"></div>
-              <div class="lon" style="--r: 60deg"></div>
-              <div class="lon" style="--r:120deg"></div>
-
-              <div class="sphere-ring"></div>
-              <div class="sphere-inner" id="sphereInner"></div>
-              <div class="sphere-glass"></div>
+        <!-- ═══════ BINGO CYLINDER MACHINE + LIVE BOARD ═══════ -->
+        <div class="cylinder-live-layout">
+          <div class="cylinder-column">
+            <div class="cylinder-machine-title"><span class="cm-light"></span> BINGO MACHINE <span class="cm-light"></span></div>
+            <div id="sphereStage" class="sphere-stage cylinder-stage">
+              <div class="sphere-wrap cylinder-wrap">
+                <div class="sphere cylinder-machine" id="sphereBody">
+                  <div class="cylinder-top-cap"></div>
+                  <div class="cylinder-window"></div>
+                  <div class="cylinder-inner-frame">
+                    <div class="sphere-inner" id="sphereInner"></div>
+                  </div>
+                  <div class="cylinder-glass"></div>
+                  <div class="cylinder-rail rail-left"></div>
+                  <div class="cylinder-rail rail-right"></div>
+                  <div class="cylinder-rings ring-top"></div>
+                  <div class="cylinder-rings ring-bottom"></div>
+                </div>
+                <div class="sphere-base cylinder-base">
+                  <div class="cylinder-foot left-foot"></div>
+                  <div class="cylinder-foot right-foot"></div>
+                </div>
+                <div class="sphere-shadow cylinder-shadow"></div>
+              </div>
+              <div class="sphere-status" id="sphereStatus"><span class="ss-dot"></span><span id="sphereStatusText">Waiting for next draw…</span></div>
+              <div class="release-ball" id="releaseBall"><div class="rb-face"><span id="releaseBallLetter">B</span><span id="releaseBallNum">–</span></div></div>
+              <div class="release-trail" id="releaseTrail"></div>
             </div>
-            <div class="sphere-base"></div>
-            <div class="sphere-shadow"></div>
           </div>
-          <div class="sphere-status" id="sphereStatus"><span class="ss-dot"></span><span id="sphereStatusText">Waiting for next draw…</span></div>
-          <div class="release-ball" id="releaseBall"><div class="rb-face"><span id="releaseBallLetter">B</span><span id="releaseBallNum">–</span></div></div>
-          <div class="release-trail" id="releaseTrail"></div>
-        </div>
 
-        <div class="ball" id="liveBall">–</div>
-        <div style="margin:6px 0;display:flex;gap:6px">
-          <button id="btnFsBoard" class="secondary mini" style="flex:1">🔍 Fullscreen</button>
-          <button id="btnToggleVoice" class="ghost mini" style="flex:1">🔊 Voice: ON</button>
-        </div>
-        <div style="display:flex;flex:1;min-height:0;margin-top:6px">
-          <div class="bingo-board" id="liveBoard"></div>
+          <div class="cylinder-board-column">
+            <div class="cylinder-board-title"><span class="brand-mark">B</span> BINGO GAME <span class="brand-mark">O</span></div>
+            <div class="cylinder-latest"><span>CALLED</span><strong id="liveBall">–</strong></div>
+            <div class="cylinder-board-actions">
+              <button id="btnFsBoard" class="secondary mini">🔍 Fullscreen</button>
+              <button id="btnToggleVoice" class="ghost mini">🔊 Voice: ON</button>
+            </div>
+            <div class="cylinder-board-wrap">
+              <div class="bingo-board" id="liveBoard"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
