@@ -1544,6 +1544,97 @@
 @media(max-height:650px) and (max-width:700px){.cylinder-wrap{height:210px}.cylinder-stage{min-height:225px}}
 @media(min-width:900px){.cylinder-wrap{height:min(58vh,500px);width:min(100%,300px)}}
 
+
+/* ===== COMPACT PORTRAIT LIVE LAYOUT ===== */
+.live-summary-compact{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;align-items:stretch;margin:5px 0 8px}
+.live-summary-compact .players-panel,.live-summary-compact .pattern-strip{margin:0;min-height:0;height:100%;box-sizing:border-box}
+.live-summary-compact .players-panel{padding:5px 7px}
+.live-summary-compact .pp-row{min-height:22px;padding:2px 0;font-size:.66rem}
+.live-summary-compact .pp-row strong{font-size:.68rem}
+
+/* WINNING PATTERN — large header with the selected pattern underneath */
+.live-summary-compact .pattern-strip{
+  min-height:150px;
+  padding:10px 8px;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  align-items:center;
+  gap:7px;
+  text-align:center;
+  position:relative;
+}
+.live-summary-compact .pattern-strip .ptext{
+  width:100%;
+  min-width:0;
+  flex:0 0 auto;
+}
+.live-summary-compact .pattern-strip .ptitle{
+  font-size:.72rem;
+  letter-spacing:2px;
+  line-height:1.1;
+  color:#fff;
+  opacity:1;
+  font-weight:900;
+  text-shadow:0 1px 6px rgba(0,0,0,.55);
+}
+.live-summary-compact .pattern-strip .pname{
+  margin-top:5px;
+  font-size:1.05rem;
+  line-height:1.15;
+  color:#fde68a;
+  font-weight:900;
+  letter-spacing:.7px;
+  text-shadow:0 0 12px rgba(251,191,36,.65);
+}
+.live-summary-compact .pattern-grid{
+  width:82px;
+  height:82px;
+  min-width:82px;
+  padding:5px;
+  grid-template-columns:repeat(5,1fr);
+  grid-template-rows:repeat(5,1fr);
+  gap:2px;
+  margin-top:1px;
+}
+.live-summary-compact .pattern-grid .pattern-cell{border-radius:3px}
+.compact-last5{margin-top:4px;padding-top:4px;border-top:1px solid rgba(148,163,184,.12)}
+.compact-last5 .last5-title{font-size:.48rem;height:auto;margin:0 0 3px;letter-spacing:.5px}
+.compact-last5 .last5-track{gap:3px;display:grid;grid-template-columns:repeat(5,1fr)}
+.compact-last5 .last5-slot{min-width:0;height:27px;border-radius:6px}
+.compact-last5 .last5-slot .l5-letter{font-size:.39rem}
+.compact-last5 .last5-slot .l5-num{font-size:.68rem}
+.cylinder-live-layout{margin-top:2px;gap:5px}
+.cylinder-stage{min-height:205px;padding:0 0 2px}
+.cylinder-wrap{height:clamp(190px,39vh,330px)}
+.cylinder-machine-title,.cylinder-board-title{height:24px;font-size:.58rem}
+.cylinder-board-column{padding:3px}
+.cylinder-board-wrap{min-height:185px}
+@media(max-width:700px){
+  .live-summary-compact{grid-template-columns:48% 52%;gap:4px;margin:3px 0 6px}
+  .live-summary-compact .players-panel{padding:4px 5px}
+  .live-summary-compact .pp-row{min-height:19px;font-size:.56rem}
+  .live-summary-compact .pp-row strong{font-size:.59rem}
+  .live-summary-compact .pattern-strip{min-height:132px;padding:8px 5px;gap:5px}
+  .live-summary-compact .pattern-strip .ptitle{font-size:.58rem;letter-spacing:1.5px}
+  .live-summary-compact .pattern-strip .pname{font-size:.9rem;line-height:1.1;margin-top:4px}
+  .live-summary-compact .pattern-grid{width:70px;height:70px;min-width:70px;padding:4px;gap:1px}
+  .live-summary-compact .pattern-grid .pattern-cell{border-radius:2px}
+  .compact-last5 .last5-title{font-size:.4rem}
+  .compact-last5 .last5-slot{height:23px}
+  .compact-last5 .last5-slot .l5-letter{font-size:.32rem}
+  .compact-last5 .last5-slot .l5-num{font-size:.56rem}
+  .cylinder-live-layout{grid-template-columns:43% 57%;gap:3px}
+  .cylinder-stage{min-height:185px}
+  .cylinder-wrap{height:clamp(175px,34vh,280px)}
+  .cylinder-machine-title,.cylinder-board-title{height:21px;font-size:.46rem;letter-spacing:.35px}
+  .cylinder-board-wrap{min-height:165px}
+}
+@media(max-height:700px) and (max-width:700px){
+  .cylinder-wrap{height:180px}
+  .cylinder-stage{min-height:188px}
+}
+
 </style>
 </head>
 <body>
@@ -1722,20 +1813,26 @@
         </div>
         <div class="countdown" id="countdown">Loading…</div>
 
-        <div id="playersPanel" class="players-panel">
-          <div class="pp-row"><span>Players</span><strong id="ppTotal">0</strong></div>
-          <div class="pp-row"><span>Entry</span><strong id="ppEntry" class="pp-gold">0 Birr</strong></div>
-          <div class="pp-row"><span>Total</span><strong id="ppTotalMoney" class="pp-green">0 Birr</strong></div>
-          <div class="pp-row"><span>Commission (15%)</span><strong id="ppCommission" class="pp-red">0 Birr</strong></div>
-          <div class="pp-row pp-prize"><span>Prize</span><strong id="ppPrize">0 Birr</strong></div>
-        </div>
-
-        <div class="pattern-strip enhanced">
-          <div class="ptext">
-            <div class="ptitle">Winning pattern</div>
-            <div class="pname" id="patternName">—</div>
+        <div class="live-summary-compact">
+          <div id="playersPanel" class="players-panel">
+            <div class="pp-row"><span>Players</span><strong id="ppTotal">0</strong></div>
+            <div class="pp-row"><span>Entry</span><strong id="ppEntry" class="pp-gold">0 Birr</strong></div>
+            <div class="pp-row"><span>Total</span><strong id="ppTotalMoney" class="pp-green">0 Birr</strong></div>
+            <div class="pp-row"><span>Commission (15%)</span><strong id="ppCommission" class="pp-red">0 Birr</strong></div>
+            <div class="pp-row pp-prize"><span>Prize</span><strong id="ppPrize">0 Birr</strong></div>
+            <div class="compact-last5">
+              <div class="last5-title"><span class="live-dot"></span> LAST 5 CALLED</div>
+              <div class="last5-track" id="playersLast5Track"></div>
+            </div>
           </div>
-          <div class="pattern-grid" id="patternGridMini"></div>
+
+          <div class="pattern-strip enhanced">
+            <div class="ptext">
+              <div class="ptitle">WINNING PATTERN</div>
+              <div class="pname" id="patternName">—</div>
+            </div>
+            <div class="pattern-grid" id="patternGridMini"></div>
+          </div>
         </div>
         <!-- ═══════ BINGO CYLINDER MACHINE + LIVE BOARD ═══════ -->
         <div class="cylinder-live-layout">
@@ -1883,6 +1980,10 @@
             color:#02121a;padding:3px 10px;border-radius:999px;font-weight:900">0</span></h2>
         <div class="toggle"><span>🔊 Amharic voice calls</span>
           <input type="checkbox" id="voiceOn" checked /></div>
+        <div class="compact-last5" style="margin:5px 0 7px">
+          <div class="last5-title"><span class="live-dot"></span> LAST 5 CALLED</div>
+          <div class="last5-track" id="playLast5Track"></div>
+        </div>
         <div style="display:flex;flex-wrap:wrap;justify-content:center" id="myCards"></div>
         <button id="btnBingo" disabled>🎉 BINGO!</button>
         <div class="msg" id="gameMsg"></div>
@@ -4010,11 +4111,34 @@ window.AudioCaller=AudioCaller;
     };
   })();
 
+  function renderLast5Numbers(){
+    const tracks=[$('playersLast5Track'),$('playLast5Track')].filter(Boolean);
+    if(!tracks.length)return;
+    const nums=Array.from(state.called||[]).slice(-5);
+    const padded=[...Array(Math.max(0,5-nums.length)).fill(null),...nums];
+    tracks.forEach(track=>{
+      track.innerHTML='';
+      padded.forEach((n,i)=>{
+        const slot=document.createElement('div');
+        const latest=n!=null&&i===padded.length-1;
+        slot.className='last5-slot '+(n==null?'empty':'filled')+(latest?' latest':'');
+        if(n!=null){
+          const letter=n<=15?'B':n<=30?'I':n<=45?'N':n<=60?'G':'O';
+          slot.innerHTML='<span class="l5-letter">'+letter+'</span><span class="l5-num">'+n+'</span>';
+        }else slot.innerHTML='<span class="l5-letter">—</span><span class="l5-num">–</span>';
+        track.appendChild(slot);
+      });
+    });
+  }
+
   function renderCalled(){
     const lb=$('liveBall');
-    if(state.latestNumber!=null){lb.textContent=state.latestNumber;
-      lb.classList.remove('new');void lb.offsetWidth;lb.classList.add('new');}
-    else lb.textContent='–';
+    if(lb){
+      if(state.latestNumber!=null){lb.textContent=state.latestNumber;
+        lb.classList.remove('new');void lb.offsetWidth;lb.classList.add('new');}
+      else lb.textContent='–';
+    }
+    renderLast5Numbers();
     renderBoards();
   }
   function renderSlotGrid(){
