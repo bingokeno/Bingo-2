@@ -3283,7 +3283,7 @@ window.AudioCaller=AudioCaller;
     await ensureRound();
     await loadAll();
     await syncState('enter-app');
-    startCountdownLoop();startDrawLoop();startBotCheckLoop();
+    startCountdownLoop();startBotCheckLoop();
     startReconcileLoop();startEnsureLoop();
     startCallPolling();
   }
@@ -3797,7 +3797,7 @@ window.AudioCaller=AudioCaller;
       const {data,error}=await sb.rpc('auto_start_round',{p_round_id:state.round.id});
       if(error)return alert('Error: '+error.message);
       if(!data.ok)return alert('Cannot start: '+data.reason);
-      await loadRound();startDrawLoop();
+      await loadRound();
       alert('Started.');
     };
   }
@@ -5124,6 +5124,7 @@ window.AudioCaller=AudioCaller;
     state.callPollTimer=setInterval(async()=>{
       if(document.hidden)return;
       if(state.pollInFlight)return;
+      if(Date.now()-state.lastCallReceivedAt < 8000) return; // realtime is healthy
       state.pollInFlight=true;
       try{
         const {data:round}=await sb.from('rounds').select('*')
@@ -5158,15 +5159,13 @@ window.AudioCaller=AudioCaller;
         }
       }catch(e){console.error('[poll] error:',e);}
       finally{state.pollInFlight=false;}
-    },2000);
+    },5000);
   }
   function startDrawLoop(){
+    // DISABLED: server cron job owns the 4-second draw cadence.
+    // The client is a pure subscriber to public.calls.
     if(state.drawTimer)return;
-    const tick=async()=>{
-      if(!state.round||state.round.status!=='playing')return;
-      try{await sb.rpc('draw_number_atomic',{p_round_id:state.round.id});}catch(e){}
-    };
-    state.drawTimer=setInterval(tick,4000);
+    state.drawTimer=setInterval(()=>{ /* no-op, kept for timer cleanup */ },60000);
   }
   function stopDrawLoop(){
     if(state.drawTimer){clearInterval(state.drawTimer);state.drawTimer=null;}
@@ -5188,7 +5187,8 @@ window.AudioCaller=AudioCaller;
         const {data}=await sb.rpc('auto_start_round',{p_round_id:state.round.id});
         if(data&&data.ok){
           await loadRound();
-          startDrawLoop();
+          // DO NOT call startDrawLoop() here.
+          // Server cron owns the draw cadence.
         }else{
           state.autoStartFiredFor=null;
         }
