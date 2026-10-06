@@ -2386,7 +2386,18 @@ if('speechSynthesis' in window){
 const AudioCaller=(function(){
  const AUDIO_BASE='./',LETTER_BASE='./';
  const preloaded={}; let currentAudio=null;
- let voiceQueue=Promise.resolve(); let enabled=true;
+ let voiceQueue=Promise.resolve(); let enabled=true; let unlocked=false;
+ function unlock(){
+  if(unlocked)return;
+  try{
+   const a=new Audio();
+   a.muted=true;a.playsInline=true;
+   a.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+   const p=a.play();
+   if(p&&p.then)p.then(()=>{a.pause();a.currentTime=0;unlocked=true;}).catch(()=>{});
+   else{a.pause();unlocked=true;}
+  }catch(e){}
+ }
  function letterFor(n){return n<=15?'B':n<=30?'I':n<=45?'N':n<=60?'G':'O';}
  function preload(n){if(preloaded[n]) return preloaded[n];
   try{const a=new Audio(AUDIO_BASE+n+'.mp3');a.preload='auto';preloaded[n]=a;}
@@ -2420,10 +2431,12 @@ const AudioCaller=(function(){
   });
  }
  function stop(){try{if(currentAudio){currentAudio.pause();currentAudio=null;}}catch(e){}
+  voiceQueue=Promise.resolve();
+  _lastPlayed=null;_lastPlayedAt=0;
   if('speechSynthesis' in window){try{speechSynthesis.cancel();}catch(e){}}}
  function setEnabled(v){enabled=!!v;if(!enabled) stop();}
  preloadAll();
- return {playNumber,stop,setEnabled,preload,preloadAll,letterFor};
+ return {playNumber,stop,setEnabled,preload,preloadAll,letterFor,unlock};
 })();
 window.AudioCaller=AudioCaller;
 
@@ -2734,14 +2747,19 @@ window.AudioCaller=AudioCaller;
     });
     if($('fsLatest'))$('fsLatest').textContent=state.latestNumber||'–';
   }
-  function applyCall(n,silent){
+  function applyCall(n,silent,sourceRoundId){
     if(state.called.has(n))return;
     state.called.add(n);state.latestNumber=n;state.lastCallReceivedAt=Date.now();
     renderCalled();
     const ball=$('liveBall');
     if(ball){ball.classList.remove('burst');void ball.offsetWidth;ball.classList.add('burst');}
     autoDaubAll();
-    if(!silent){
+    // Realtime INSERTs come from the active round channel. During the
+    // OPEN -> PLAYING transition, state.round can briefly still say OPEN.
+    // Trust that channel for a live call; historical sync calls stay silent.
+    const roundIsPlaying=!!(state.round&&state.round.status==='playing');
+    const liveChannelCall=!!(sourceRoundId&&state.round&&state.round.id===sourceRoundId);
+    if(!silent&&(roundIsPlaying||liveChannelCall)){
       playChime(); AudioCaller.playNumber(n);
       if(isOnLiveTab()){
         SphereEngine.play(n);
@@ -2954,7 +2972,10 @@ window.AudioCaller=AudioCaller;
     $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');};
 
   $('btnLogin').onclick=async()=>{
+    // Unlock browser media while this is still a user gesture.
+    try{AudioCaller.unlock();}catch(e){}
     initAudio();
+    try{if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();}catch(e){}
     const ident=$('loginPhone').value.trim();
     const pass =$('loginPass').value;
     const name =$('loginName').value.trim();
@@ -4003,6 +4024,11 @@ window.AudioCaller=AudioCaller;
   }
   $('btnModalClose').onclick=()=>{$('cardModal').style.display='none';state.previewSlot=null;};
   $('btnModalSelect').onclick=async()=>{
+    // Unlock media before the async purchase RPC; on iPhone/iPad waiting
+    // until after the RPC can cause later MP3 playback to be blocked.
+    try{AudioCaller.unlock();}catch(e){}
+    initAudio();
+    try{if(audioCtx&&audioCtx.state==='suspended')await audioCtx.resume();}catch(e){}
     const s=state.previewSlot;if(s==null)return;
     const card=state.pool.find(c=>c.slot_number===s);
     if(!card||card.status!=='available'||card.is_bot)return;
@@ -4825,7 +4851,11 @@ window.AudioCaller=AudioCaller;
     state.channels.push(sb.channel('rt-calls-'+roundId)
       .on('postgres_changes',
         {event:'INSERT',schema:'public',table:'calls',filter:'round_id=eq.'+roundId},
-        payload=>{applyCall(payload.new.number);})
+        payload=>{
+          // This channel belongs to the active round. Passing roundId avoids
+          // losing the first live calls during the OPEN -> PLAYING update race.
+          applyCall(payload.new.number,false,roundId);
+        })
       .subscribe((status,err)=>{
         if(status==='SUBSCRIBED')scheduleResync('calls-subscribed');
         if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status))
