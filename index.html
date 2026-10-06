@@ -2428,6 +2428,7 @@ if('speechSynthesis' in window){
     healthTimer:null,ensureTimer:null,ballTimeout:null,latestTimeout:null,
     cornerPopTimeout:null,ball3DTimeout:null,
     lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,
+    presentationQueue:[],presentationRunning:false,presentationStartedAt:0,
     currentlyShowingRoundId:null,lastPatternShownFor:null,
     adminSelectedPattern:'random',adminFolder:null,
     resyncTimer:null,reconcileTimer:null,poolDebounce:null,
@@ -2554,30 +2555,34 @@ const AudioCaller=(function(){
   setTimeout(step,800);}
  function playOnce(src,volume){return new Promise(resolve=>{try{
   const a=new Audio(src); a.volume=volume==null?1:volume;
-  a.onended=()=>{ console.log('🔊 played', src); resolve(true); };
-  a.onerror =()=>{ console.error('❌ load fail', src); resolve(false); };
+  currentAudio=a;
+  a.onended=()=>{ currentAudio=null; console.log('🔊 played',src); resolve(true); };
+  a.onerror=()=>{ currentAudio=null; console.error('❌ load fail',src); resolve(false); };
   const p=a.play();
-  if(p&&p.catch) p.catch(err=>{ console.error('❌ play block', src, err.name); resolve(false); });
- }catch(e){ console.error('❌ exception', src, e); resolve(false); }});}
+  if(p&&p.catch)p.catch(err=>{currentAudio=null;console.error('❌ play block',src,err.name);resolve(false);});
+ }catch(e){currentAudio=null;console.error('❌ exception',src,e);resolve(false);}});}
  let _lastPlayed=null,_lastPlayedAt=0;
  function playNumber(n){
-  if(!enabled) return;
+  if(!enabled)return Promise.resolve(false);
   const now=Date.now();
   if(_lastPlayed===n && now-_lastPlayedAt<4000){
     console.log('[AudioCaller] duplicate skipped:',n);
-    return;
+    return Promise.resolve(false);
   }
   _lastPlayed=n;_lastPlayedAt=now;
 
-  voiceQueue=voiceQueue.then(async()=>{
+  const job=voiceQueue.then(async()=>{
    const letter=letterFor(n);
    const letterOk=await playOnce(LETTER_BASE+letter+'.mp3',1);
    await new Promise(r=>setTimeout(r,letterOk?120:60));
    const numOk=await playOnce(AUDIO_BASE+n+'.mp3',1);
    if(!numOk) console.error('❌ MP3 FAILED ./'+n+'.mp3');
+   return !!numOk;
   });
+  voiceQueue=job.catch(()=>{});
+  return job;
  }
- function stop(){try{if(currentAudio){currentAudio.pause();currentAudio=null;}}catch(e){}
+ function stop(){try{if(currentAudio){currentAudio.pause();currentAudio.currentTime=0;currentAudio=null;}}catch(e){}
   voiceQueue=Promise.resolve();
   _lastPlayed=null;_lastPlayedAt=0;
   if('speechSynthesis' in window){try{speechSynthesis.cancel();}catch(e){}}}
@@ -2894,6 +2899,40 @@ window.AudioCaller=AudioCaller;
     });
     if($('fsLatest'))$('fsLatest').textContent=state.latestNumber||'–';
   }
+  function enqueueLiveCall(n){
+    if(!n)return;
+    state.presentationQueue.push(n);
+    runPresentationQueue().catch(e=>console.error('[presentation] error:',e));
+  }
+
+  async function runPresentationQueue(){
+    if(state.presentationRunning)return;
+    state.presentationRunning=true;
+    try{
+      while(state.presentationQueue.length){
+        const n=state.presentationQueue.shift();
+        const started=performance.now();
+        state.presentationStartedAt=Date.now();
+
+        // The physical machine and the full voice announcement belong to ONE call.
+        // The next call is not allowed to start until BOTH are finished.
+        playChime();
+        const machinePromise=(
+          isOnLiveTab() && typeof SphereEngine!=='undefined'
+        ) ? SphereEngine.play(n) : Promise.resolve(true);
+        const voicePromise=state.voiceOn ? AudioCaller.playNumber(n) : Promise.resolve(true);
+
+        await Promise.allSettled([machinePromise,voicePromise]);
+
+        // Minimum 4 seconds between visible/announced balls.
+        const remaining=Math.max(0,4000-(performance.now()-started));
+        if(remaining>0)await new Promise(r=>setTimeout(r,remaining));
+      }
+    }finally{
+      state.presentationRunning=false;
+    }
+  }
+
   function applyCall(n,silent,sourceRoundId){
     if(state.called.has(n))return;
     state.called.add(n);state.latestNumber=n;state.lastCallReceivedAt=Date.now();
@@ -2901,20 +2940,20 @@ window.AudioCaller=AudioCaller;
     const ball=$('liveBall');
     if(ball){ball.classList.remove('burst');void ball.offsetWidth;ball.classList.add('burst');}
     autoDaubAll();
-    // Realtime INSERTs come from the active round channel. During the
-    // OPEN -> PLAYING transition, state.round can briefly still say OPEN.
-    // Trust that channel for a live call; historical sync calls stay silent.
+
+    // Only a genuine live Realtime INSERT is presented with animation + voice.
+    // Calls loaded during join/resync are recorded silently so late joiners
+    // immediately have the correct board without replaying old balls.
     const roundIsPlaying=!!(state.round&&state.round.status==='playing');
     const liveChannelCall=!!(sourceRoundId&&state.round&&state.round.id===sourceRoundId);
     if(!silent&&(roundIsPlaying||liveChannelCall)){
-      playChime(); AudioCaller.playNumber(n);
-      if(isOnLiveTab()){
-        SphereEngine.play(n);
-      }
+      enqueueLiveCall(n);
     }
+
     clearTimeout(state.latestTimeout);
     state.latestTimeout=setTimeout(()=>renderBoards(),3000);
   }
+
   function wireCopy(btnId,iconId){
     const btn=$(btnId),icon=$(iconId);if(!btn)return;
     btn.onclick=async()=>{
@@ -5127,7 +5166,7 @@ window.AudioCaller=AudioCaller;
       if(!state.round||state.round.status!=='playing')return;
       try{await sb.rpc('draw_number_atomic',{p_round_id:state.round.id});}catch(e){}
     };
-    state.drawTimer=setInterval(tick,3000);
+    state.drawTimer=setInterval(tick,4000);
   }
   function stopDrawLoop(){
     if(state.drawTimer){clearInterval(state.drawTimer);state.drawTimer=null;}
@@ -5512,17 +5551,70 @@ window.AudioCaller=AudioCaller;
     function destination(n){const board=$('liveBoard');if(!board)return null;const cell=board.querySelector('.num[data-num="'+n+'"]');if(!cell)return null;const r=cell.getBoundingClientRect();return {cx:r.left+r.width/2,cy:r.top+r.height/2}}
     function pulse(n){renderBoards();const board=$('liveBoard');if(!board)return;const cell=board.querySelector('.num[data-num="'+n+'"]');if(!cell)return;cell.classList.remove('landing');void cell.offsetWidth;cell.classList.add('landing');setTimeout(()=>cell.classList.remove('landing'),1700);cell.classList.add('latest')}
     function play(n){
-      if(!initialized)init();if(!stageEl||!sphereEl||!releaseEl)return;if(sequenceRunning){queuedNumber=n;return}sequenceRunning=true;setMode('charging');
-      const charge=reducedMotion?200:900,turbo=reducedMotion?300:700;
-      setTimeout(()=>setMode('turbo'),charge);
-      setTimeout(()=>{
-        const sr=sphereEl.getBoundingClientRect(),sx=sr.left+sr.width/2,sy=sr.top+sr.height/2,d=destination(n),dx=d?d.cx:innerWidth/2,dy=d?d.cy:innerHeight/2;
-        releaseEl.className='release-ball show '+letterClass(n);$('releaseBallLetter').textContent=letterFor(n);$('releaseBallNum').textContent=n;releaseEl.style.left=sx+'px';releaseEl.style.top=sy+'px';releaseEl.style.transform='translate(-50%,-50%) scale(.3)';trailEl.classList.add('show');trailEl.style.left=sx+'px';trailEl.style.top=sy+'px';
-        const ms=reducedMotion?350:1150,t0=performance.now(),c1x=sx+(dx-sx)*.35,c1y=sy-Math.max(80,Math.abs(dy-sy)*.55),c2x=sx+(dx-sx)*.72,c2y=dy-Math.max(40,Math.abs(dy-sy)*.2);
-        const bez=(t,a,b,c,d)=>{const m=1-t;return m*m*m*a+3*m*m*t*b+3*m*t*t*c+t*t*t*d};
-        const fly=t=>{const p=Math.min(1,(t-t0)/ms),x=bez(p,sx,c1x,c2x,dx),y=bez(p,sy,c1y,c2y,dy),scale=.3+Math.min(1,p*1.6)*.85-Math.max(0,p-.85)*.7;releaseEl.style.left=x+'px';releaseEl.style.top=y+'px';releaseEl.style.transform='translate(-50%,-50%) scale('+scale.toFixed(3)+')';trailEl.style.left=x+'px';trailEl.style.top=y+'px';if(p<1)requestAnimationFrame(fly);else land(n)};requestAnimationFrame(fly);
-      },charge+turbo);
-      function land(num){pulse(num);setTimeout(()=>{releaseEl.className='release-ball';trailEl.classList.remove('show')},reducedMotion?200:520);setTimeout(()=>{setMode(state.round&&state.round.status==='playing'?'live':'preview');sequenceRunning=false;if(queuedNumber!=null){const q=queuedNumber;queuedNumber=null;play(q)}},reducedMotion?300:800)}
+      if(!initialized)init();
+      if(!stageEl||!sphereEl||!releaseEl)return Promise.resolve(false);
+      if(sequenceRunning){
+        queuedNumber=n;
+        return Promise.resolve(false);
+      }
+      sequenceRunning=true;
+      setMode('charging');
+
+      return new Promise(resolve=>{
+        const charge=reducedMotion?200:900,turbo=reducedMotion?300:700;
+        setTimeout(()=>setMode('turbo'),charge);
+
+        setTimeout(()=>{
+          const sr=sphereEl.getBoundingClientRect(),
+            sx=sr.left+sr.width/2,sy=sr.top+sr.height/2,
+            d=destination(n),dx=d?d.cx:innerWidth/2,dy=d?d.cy:innerHeight/2;
+
+          releaseEl.className='release-ball show '+letterClass(n);
+          $('releaseBallLetter').textContent=letterFor(n);
+          $('releaseBallNum').textContent=n;
+          releaseEl.style.left=sx+'px';
+          releaseEl.style.top=sy+'px';
+          releaseEl.style.transform='translate(-50%,-50%) scale(.3)';
+          trailEl.classList.add('show');
+          trailEl.style.left=sx+'px';
+          trailEl.style.top=sy+'px';
+
+          const ms=reducedMotion?350:1150,t0=performance.now(),
+            c1x=sx+(dx-sx)*.35,c1y=sy-Math.max(80,Math.abs(dy-sy)*.55),
+            c2x=sx+(dx-sx)*.72,c2y=dy-Math.max(40,Math.abs(dy-sy)*.2);
+          const bez=(t,a,b,c,d)=>{const m=1-t;return m*m*m*a+3*m*m*t*b+3*m*t*t*c+t*t*t*d};
+          const fly=t=>{
+            const p=Math.min(1,(t-t0)/ms),
+              x=bez(p,sx,c1x,c2x,dx),y=bez(p,sy,c1y,c2y,dy),
+              scale=.3+Math.min(1,p*1.6)*.85-Math.max(0,p-.85)*.7;
+            releaseEl.style.left=x+'px';
+            releaseEl.style.top=y+'px';
+            releaseEl.style.transform='translate(-50%,-50%) scale('+scale.toFixed(3)+')';
+            trailEl.style.left=x+'px';
+            trailEl.style.top=y+'px';
+            if(p<1)requestAnimationFrame(fly);
+            else land(n);
+          };
+          requestAnimationFrame(fly);
+        },charge+turbo);
+
+        function land(num){
+          pulse(num);
+          setTimeout(()=>{
+            releaseEl.className='release-ball';
+            trailEl.classList.remove('show');
+          },reducedMotion?200:520);
+          setTimeout(()=>{
+            setMode(state.round&&state.round.status==='playing'?'live':'preview');
+            sequenceRunning=false;
+            resolve(true);
+            if(queuedNumber!=null){
+              const q=queuedNumber;queuedNumber=null;
+              play(q);
+            }
+          },reducedMotion?300:800);
+        }
+      });
     }
     function onRoundChange(round){init();if(!round){activeRoundId=null;setMode('preview');return}if(activeRoundId!==round.id){activeRoundId=round.id;setMode(round.status==='playing'?'live':'preview')}else if(round.status==='playing')setStatus('Live round in progress','live');else if(round.status==='finished')setStatus('Round finished','idle');else setStatus('Waiting for next draw…','idle')}
     function destroy(){stopLoop();if(innerEl)innerEl.innerHTML='';MINI_BALLS.length=0;sequenceRunning=false;queuedNumber=null;initialized=false}
