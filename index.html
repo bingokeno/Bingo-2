@@ -4250,8 +4250,14 @@ window.AudioCaller=AudioCaller;
     }
     const btn=$('btnModalSelect');
     btn.disabled=true;btn.textContent='⏳ BUYING…';
-    const {data,error}=await sb.rpc('buy_cards_with_balance',
-      {p_user_id:state.user.id,p_slot_numbers:[s]});
+
+    const _buyResult = await Promise.race([
+      sb.rpc('buy_cards_with_balance',{p_user_id:state.user.id,p_slot_numbers:[s]}),
+      new Promise(resolve =>
+        setTimeout(() => resolve({data:null,error:{message:'timeout'}}), 10000))
+    ]).catch(e => ({data:null,error:{message:e.message||'network'}}));
+
+    const {data,error} = _buyResult;
     if(error){
       btn.disabled=false;btn.textContent='💳 BUY THIS CARD · '+CARD_PRICE+' BIRR';
       return setMsg('modalMsg','Error: '+error.message,'var(--danger)');
