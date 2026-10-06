@@ -2901,6 +2901,10 @@ window.AudioCaller=AudioCaller;
   }
   function enqueueLiveCall(n){
     if(!n)return;
+    // The server is the clock. Never build a long client-side backlog.
+    // If another call is already being presented, keep only the newest
+    // pending call so the machine cannot fall several numbers behind.
+    state.presentationQueue.length=0;
     state.presentationQueue.push(n);
     runPresentationQueue().catch(e=>console.error('[presentation] error:',e));
   }
@@ -2910,26 +2914,36 @@ window.AudioCaller=AudioCaller;
     state.presentationRunning=true;
     try{
       while(state.presentationQueue.length){
-        const n=state.presentationQueue.shift();
-        const started=performance.now();
+        // Collapse any calls that arrived while the previous visual was running.
+        const n=state.presentationQueue[state.presentationQueue.length-1];
+        state.presentationQueue.length=0;
+        if(!n)continue;
         state.presentationStartedAt=Date.now();
 
-        // The physical machine and the full voice announcement belong to ONE call.
-        // The next call is not allowed to start until BOTH are finished.
+        // The server call is the source of truth. The physical machine must
+        // present that exact number. Voice runs independently so a long MP3
+        // can never make the visual machine fall behind the server.
         playChime();
         const machinePromise=(
           isOnLiveTab() && typeof SphereEngine!=='undefined'
         ) ? SphereEngine.play(n) : Promise.resolve(true);
         const voicePromise=state.voiceOn ? AudioCaller.playNumber(n) : Promise.resolve(true);
 
-        await Promise.allSettled([machinePromise,voicePromise]);
+        await Promise.allSettled([machinePromise]);
+        // Start voice without making the next server call wait for it.
+        Promise.resolve(voicePromise).catch(e=>console.warn('[voice] error:',e));
 
-        // Minimum 4 seconds between visible/announced balls.
-        const remaining=Math.max(0,4000-(performance.now()-started));
+        // Keep only a small safety margin; the server remains authoritative
+        // and calls normally arrive every ~4 seconds.
+        const elapsed=Date.now()-state.presentationStartedAt;
+        const remaining=Math.max(0,3900-elapsed);
         if(remaining>0)await new Promise(r=>setTimeout(r,remaining));
       }
     }finally{
       state.presentationRunning=false;
+      // A call may have arrived during the final cleanup tick. Present the
+      // newest one immediately rather than leaving a stale visual.
+      if(state.presentationQueue.length)runPresentationQueue().catch(e=>console.error('[presentation] error:',e));
     }
   }
 
