@@ -3380,10 +3380,17 @@ window.AudioCaller=AudioCaller;
       }
 
       // REBUILD. Never merge.
-      state.called = new Set((calls||[]).map(c=>c.number));
-      state.presentedCalls = new Set(state.called);
-      state.latestNumber = (calls||[]).length ? calls[calls.length-1].number : null;
-      state.renderedLatestNumber = null;
+      // MERGE. Do not rebuild.
+      const serverSet = new Set((calls||[]).map(c=>c.number));
+      for(const n of serverSet){
+        if(!state.called.has(n)){
+          state.called.add(n);
+          state.presentedCalls.add(n);
+        }
+      }
+      if((calls||[]).length){
+        state.latestNumber = calls[calls.length-1].number;
+      }
 
       await loadPool();
       maybeSeedBots();
@@ -5067,12 +5074,18 @@ window.AudioCaller=AudioCaller;
         if(!state.round || state.round.id !== fetchedRoundId){
           console.warn('[syncState] round changed during calls fetch — skipping apply');
         } else {
-          // REBUILD. Never merge. This kills the ghost numbers.
-          const freshSet = new Set((calls||[]).map(c=>c.number));
-          state.called = freshSet;
-          state.presentedCalls = new Set(freshSet);
-          state.latestNumber = (calls||[]).length ? calls[calls.length-1].number : null;
-          state.renderedLatestNumber = null;
+          // MERGE. Do not rebuild — rebuilding would erase any Realtime
+          // calls that arrived while this fetch was in flight.
+          const serverSet = new Set((calls||[]).map(c=>c.number));
+          for(const n of serverSet){
+            if(!state.called.has(n)){
+              state.called.add(n);
+              state.presentedCalls.add(n);
+            }
+          }
+          if((calls||[]).length){
+            state.latestNumber = calls[calls.length-1].number;
+          }
         }
 
         renderRound();
@@ -5247,14 +5260,12 @@ window.AudioCaller=AudioCaller;
     },1000);
   }
   function startBotCheckLoop(){
-    if(state.botCheckTimer)return;
-    state.botCheckTimer=setInterval(async()=>{
-      if(!state.round||state.round.status!=='playing')return;
-      try{
-        const {data}=await sb.rpc('check_bot_bingo',{p_round_id:state.round.id});
-        if(data&&data.ok&&data.winner)await loadRound();
-      }catch(e){}
-    },1000);
+    // DISABLED. The server's draw_number_atomic() already calls
+    // check_bot_bingo() on every draw. When the client calls it again,
+    // the winner response triggers loadRound(), which wipes the live
+    // board and races the Realtime channel. The server is the sole
+    // authority on winners.
+    return;
   }
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden)return;
