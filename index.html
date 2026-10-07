@@ -2428,10 +2428,6 @@ if('speechSynthesis' in window){
     healthTimer:null,ensureTimer:null,ballTimeout:null,latestTimeout:null,
     cornerPopTimeout:null,ball3DTimeout:null,
     lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,
-    // Prevent the same server call from being presented twice when Realtime
-    // and the 1-second repair sync overlap.
-    presentedCalls:new Set(),
-    renderedLatestNumber:null,
     presentationQueue:[],presentationRunning:false,presentationStartedAt:0,
     currentlyShowingRoundId:null,lastPatternShownFor:null,
     adminSelectedPattern:'random',adminFolder:null,
@@ -2905,10 +2901,7 @@ window.AudioCaller=AudioCaller;
   }
   function enqueueLiveCall(n){
     if(!n)return;
-    // Never drop calls. Queue every number the server sends.
-    if(!state.presentationQueue.includes(n)){
-      state.presentationQueue.push(n);
-    }
+    state.presentationQueue.push(n);
     runPresentationQueue().catch(e=>console.error('[presentation] error:',e));
   }
 
@@ -2917,53 +2910,33 @@ window.AudioCaller=AudioCaller;
     state.presentationRunning=true;
     try{
       while(state.presentationQueue.length){
-        // Take the OLDEST call in the queue (FIFO, not LIFO).
         const n=state.presentationQueue.shift();
-        if(!n)continue;
-
-        // Catch-up mode: skip animations if we're >5 calls behind.
-        const isCatchUp = state.presentationQueue.length > 5;
-
+        const started=performance.now();
         state.presentationStartedAt=Date.now();
+
+        // The physical machine and the full voice announcement belong to ONE call.
+        // The next call is not allowed to start until BOTH are finished.
         playChime();
-
-        const machinePromise = isCatchUp
-          ? Promise.resolve(true)
-          : (isOnLiveTab() && typeof SphereEngine!=='undefined'
-              ? SphereEngine.play(n)
-              : Promise.resolve(true));
-
+        const machinePromise=(
+          isOnLiveTab() && typeof SphereEngine!=='undefined'
+        ) ? SphereEngine.play(n) : Promise.resolve(true);
         const voicePromise=state.voiceOn ? AudioCaller.playNumber(n) : Promise.resolve(true);
 
-        // Cap the machine animation wait at 1500ms.
-        await Promise.race([
-          machinePromise,
-          new Promise(r => setTimeout(r, 1500))
-        ]);
+        await Promise.allSettled([machinePromise,voicePromise]);
 
-        Promise.resolve(voicePromise).catch(e=>console.warn('[voice] error:',e));
-
-        // Pace at 1500ms per number, unless in catch-up mode.
-        if(!isCatchUp && state.presentationQueue.length > 0){
-          const elapsed=Date.now()-state.presentationStartedAt;
-          const remaining=Math.max(0,1500-elapsed);
-          if(remaining>0)await new Promise(r=>setTimeout(r,remaining));
-        }
+        // Minimum 4 seconds between visible/announced balls.
+        const remaining=Math.max(0,4000-(performance.now()-started));
+        if(remaining>0)await new Promise(r=>setTimeout(r,remaining));
       }
     }finally{
       state.presentationRunning=false;
-      if(state.presentationQueue.length){
-        runPresentationQueue().catch(e=>console.error('[presentation] error:',e));
-      }
     }
   }
 
   function applyCall(n,silent,sourceRoundId){
     if(n==null)return;
 
-    // HARD GUARD: reject any call that does not belong to the active round.
-    // This is what stops the ghost-numbers bug — a call from Round #2189
-    // can never be applied to Round #2190's board.
+    // HARD GUARD: reject any call not belonging to the active round.
     if(sourceRoundId && state.round && sourceRoundId !== state.round.id){
       console.warn('[applyCall] rejected stale call', n,
                    'from round', sourceRoundId,
@@ -3329,10 +3302,9 @@ window.AudioCaller=AudioCaller;
     await ensureRound();
     await loadAll();
     await syncState('enter-app');
-    startCountdownLoop();startBotCheckLoop();
+    startCountdownLoop();startDrawLoop();startBotCheckLoop();
     startReconcileLoop();startEnsureLoop();
-    // Live state is refreshed by the single guarded 1-second sync loop above.
-    // Do not start a second polling loop; it can race the same DOM updates.
+    startCallPolling();
   }
   function updateHeaderUser(){
     $('meName').textContent=state.user.name;
@@ -3402,15 +3374,12 @@ window.AudioCaller=AudioCaller;
       const {data:calls}=await sb.from('calls').select('number,sequence')
         .eq('round_id',fetchedRoundId).order('sequence',{ascending:true});
 
-      // HARD GUARD: if the active round changed while we were awaiting,
-      // discard this fetch entirely. Never let old calls leak onto a
-      // different round's board.
+      // If the active round changed while we were awaiting, discard.
       if(!state.round || state.round.id !== fetchedRoundId){
-        console.warn('[loadRound] round changed during fetch — discarding');
         return;
       }
 
-      // REBUILD FROM SCRATCH. Never merge into the existing Set.
+      // REBUILD. Never merge.
       state.called = new Set((calls||[]).map(c=>c.number));
       state.presentedCalls = new Set(state.called);
       state.latestNumber = (calls||[]).length ? calls[calls.length-1].number : null;
@@ -3422,9 +3391,7 @@ window.AudioCaller=AudioCaller;
     }else{
       state.called=new Set();
       state.presentedCalls=new Set();
-      state.pool=[];
-      state.myPaidCards=[];
-      state.latestNumber=null;
+      state.pool=[];state.myPaidCards=[];state.latestNumber=null;
       state.renderedLatestNumber=null;
     }
     renderRound();renderCalled();renderSlotGrid();renderMyCards();
@@ -3433,18 +3400,8 @@ window.AudioCaller=AudioCaller;
   async function loadPool(){
     const {data}=await sb.from('card_pool').select('*').eq('round_id',state.round.id)
       .order('slot_number',{ascending:true});
-    const nextPool=data||[];
-    // Detect actual pool/card changes before rebuilding the large card grids.
-    // This lets the live page poll every second without DOM stacking/flicker.
-    const signature=JSON.stringify(nextPool.map(c=>({
-      id:c.id,slot_number:c.slot_number,status:c.status,user_id:c.user_id,
-      is_bot:c.is_bot,marked:c.marked
-    })));
-    const changed=signature!==state.poolSignature;
-    state.poolSignature=signature;
-    state.pool=nextPool;
+    state.pool=data||[];
     state.myPaidCards=state.pool.filter(c=>c.status==='paid'&&c.user_id===state.user.id&&!c.is_bot);
-    return changed;
   }
   async function loadWinners(){
     const {data}=await sb.from('rounds').select('*').eq('status','finished')
@@ -3877,7 +3834,7 @@ window.AudioCaller=AudioCaller;
       const {data,error}=await sb.rpc('auto_start_round',{p_round_id:state.round.id});
       if(error)return alert('Error: '+error.message);
       if(!data.ok)return alert('Cannot start: '+data.reason);
-      await loadRound();
+      await loadRound();startDrawLoop();
       alert('Started.');
     };
   }
@@ -4037,16 +3994,7 @@ window.AudioCaller=AudioCaller;
     $('liveRoundLabel').textContent=label;
     $('fsTitle').textContent='🔴 LIVE BINGO · '+label;
     const dc=displayCounts(r);
-    // Keep the 3D Bingo machine running in place. Do not re-run its round
-    // transition logic on every one-second live refresh.
-    const sphereRoundId=r&&r.id||null;
-    const sphereStatus=r&&r.status||null;
-    if(typeof SphereEngine!=='undefined' &&
-       (state._sphereRoundId!==sphereRoundId || state._sphereStatus!==sphereStatus)){
-      state._sphereRoundId=sphereRoundId;
-      state._sphereStatus=sphereStatus;
-      SphereEngine.onRoundChange(r);
-    }
+    if(typeof SphereEngine!=='undefined')SphereEngine.onRoundChange(r);
     if(!r){
       $('liveStatus').textContent='—';$('liveKartelas').textContent='0';
       $('livePrize').textContent='0';$('liveDot').innerHTML='';
@@ -4196,27 +4144,10 @@ window.AudioCaller=AudioCaller;
       const tt=new Date(r.scheduled_start_at).getTime();
       const diff=Math.max(0,Math.floor((tt-serverMs)/1000));
       if(diff<=0){
-        // PATCH: The time is up. Force the UI to LIVE even if the server
-        // hasn't sent the status change yet. This prevents the "Starting now..."
-        // lockup.
-        el.textContent='🔴 LIVE · Round #'+r.round_number+' · '+
-          (PATTERN_LABEL[r.pattern]||'Line');
+        el.textContent='Starting now…';
         el.classList.add('live');
-        globalText='🔴 LIVE · Round #'+r.round_number;
+        globalText='Starting now…';
         globalLive=true;
-
-        // If the round is still marked 'open' locally, try to resync immediately
-        // to fetch the playing status.
-        if(r.status === 'open') {
-          // Debounce this to avoid spamming the server
-          if (!state._forceStartResyncPending) {
-            state._forceStartResyncPending = true;
-            setTimeout(() => {
-              state._forceStartResyncPending = false;
-              syncState('countdown-expired').catch(()=>{});
-            }, 1000);
-          }
-        }
       }else{
         const m=Math.floor(diff/60),s=diff%60;
         el.textContent='Round #'+r.round_number+' starts in '+m+':'+pad(s)+' · '+
@@ -4278,23 +4209,11 @@ window.AudioCaller=AudioCaller;
 
   function renderCalled(){
     const lb=$('liveBall');
-    const latest=state.latestNumber!=null?state.latestNumber:null;
-    const changed=latest!==state.renderedLatestNumber;
     if(lb){
-      if(latest!=null){
-        lb.textContent=latest;
-        // Animate only when the server actually reports a new number.
-        if(changed){
-          lb.classList.remove('new');
-          void lb.offsetWidth;
-          lb.classList.add('new');
-        }
-      }else{
-        lb.textContent='–';
-        lb.classList.remove('new');
-      }
+      if(state.latestNumber!=null){lb.textContent=state.latestNumber;
+        lb.classList.remove('new');void lb.offsetWidth;lb.classList.add('new');}
+      else lb.textContent='–';
     }
-    state.renderedLatestNumber=latest;
     renderLast5Numbers();
     renderBoards();
   }
@@ -4368,14 +4287,8 @@ window.AudioCaller=AudioCaller;
     }
     const btn=$('btnModalSelect');
     btn.disabled=true;btn.textContent='⏳ BUYING…';
-
-    const _buyResult = await Promise.race([
-      sb.rpc('buy_cards_with_balance',{p_user_id:state.user.id,p_slot_numbers:[s]}),
-      new Promise(resolve =>
-        setTimeout(() => resolve({data:null,error:{message:'timeout'}}), 10000))
-    ]).catch(e => ({data:null,error:{message:e.message||'network'}}));
-
-    const {data,error} = _buyResult;
+    const {data,error}=await sb.rpc('buy_cards_with_balance',
+      {p_user_id:state.user.id,p_slot_numbers:[s]});
     if(error){
       btn.disabled=false;btn.textContent='💳 BUY THIS CARD · '+CARD_PRICE+' BIRR';
       return setMsg('modalMsg','Error: '+error.message,'var(--danger)');
@@ -5127,52 +5040,34 @@ window.AudioCaller=AudioCaller;
     },250);
   }
   async function syncState(reason){
-    if(state.liveSyncInFlight)return;
-    state.liveSyncInFlight=true;
     try{
-      // 1. Fetch the current round
       const {data:round,error:rErr}=await sb.from('rounds').select('*')
         .in('status',['open','playing'])
         .order('created_at',{ascending:false}).limit(1).maybeSingle();
       if(rErr)throw rErr;
-
       const newRoundId=round&&round.id;
-      const roundChanged=newRoundId!==state.lastSyncedRoundId;
-
-      if(roundChanged){
+      if(newRoundId!==state.lastSyncedRoundId){
         state.lastSyncedRoundId=newRoundId;
         state.autoStartFiredFor=null;
-        // Clear old data ONLY when we are sure it's a new round
-        state.called=new Set();
-        state.presentedCalls=new Set();
-        state.latestNumber=null;
-        state.renderedLatestNumber=null;
-        state.poolSignature=null;
-        state._sphereRoundId=null;
-        state._sphereStatus=null;
         teardownRealtimeChannels();
         if(newRoundId)setupRoundChannels(newRoundId);
         else setupIdleChannels();
         syncServerTime();
       }
-
       state.round=round;
       if(round){
         const fetchedRoundId = round.id;
 
-        // 2. ALWAYS fetch the calls for this round.
         const {data:calls,error:cErr}=await sb.from('calls')
           .select('number,sequence').eq('round_id',fetchedRoundId)
           .order('sequence',{ascending:true});
         if(cErr)throw cErr;
 
-        // HARD GUARD: if the active round changed during the fetch,
-        // do not apply anything. The next sync tick will handle the new round.
+        // If round changed during fetch, discard; next sync will handle it.
         if(!state.round || state.round.id !== fetchedRoundId){
           console.warn('[syncState] round changed during calls fetch — skipping apply');
         } else {
-          // 3. REBUILD FROM SCRATCH. Never merge into the existing Set.
-          // This is the fix that stops ghost numbers appearing on a fresh board.
+          // REBUILD. Never merge. This kills the ghost numbers.
           const freshSet = new Set((calls||[]).map(c=>c.number));
           state.called = freshSet;
           state.presentedCalls = new Set(freshSet);
@@ -5180,35 +5075,15 @@ window.AudioCaller=AudioCaller;
           state.renderedLatestNumber = null;
         }
 
-        // 4. Update the UI
         renderRound();
         renderCalled();
         renderCountdown();
         renderPattern();
-
-        // 5. Update the pool (cards)
-      } else {
-        // No round found
-        state.called=new Set();
-        state.presentedCalls=new Set();
-        state.pool=[];
-        state.myPaidCards=[];
-        state.latestNumber=null;
-        state.renderedLatestNumber=null;
-        state.poolSignature=null;
-        state._sphereRoundId=null;
-        state._sphereStatus=null;
-        renderCalled();
-        renderBoards();
-        renderRound();
-        renderCountdown();
-        renderPattern();
+        await loadPool();
+        renderSlotGrid();renderMyCards();
+        if(round.status==='open')showPatternModal(round);
       }
-    }catch(e){
-      console.error('[sync] resync error:',e);
-    }finally{
-      state.liveSyncInFlight=false;
-    }
+    }catch(e){console.error('[sync] resync error:',e);}
   }
   function setupRoundChannels(roundId){
     state.channels.push(sb.channel('rt-round-'+roundId)
@@ -5282,83 +5157,92 @@ window.AudioCaller=AudioCaller;
   }
   function startReconcileLoop(){
     if(state.reconcileTimer)return;
-    let maintenanceTick=0;
     state.reconcileTimer=setInterval(()=>{
       if(document.hidden)return;
-      // Keep the live Bingo page synchronized with the server every second.
       syncState('periodic').catch(()=>{});
-      // Keep heavier account/admin maintenance at the old 5-second cadence.
-      maintenanceTick++;
-      if(maintenanceTick%5!==0)return;
       if(state.user&&!state.user.is_admin)loadUser().catch(()=>{});
       if(state.user&&state.user.is_admin){
         loadWalletRequests().catch(()=>{});
         loadPasswordResetRequests().catch(()=>{});
         loadHelpInbox().catch(()=>{});
       }
-    },1000);
+    },5000);
   }
   function startCallPolling(){
-    // DISABLED: startReconcileLoop() owns the single guarded 1-second live
-    // refresh. Keeping a second timer here causes competing renders.
-    return;
+    if(state.callPollTimer)return;
+    state.callPollTimer=setInterval(async()=>{
+      if(document.hidden)return;
+      if(state.pollInFlight)return;
+      state.pollInFlight=true;
+      try{
+        const {data:round}=await sb.from('rounds').select('*')
+          .in('status',['open','playing'])
+          .order('created_at',{ascending:false}).limit(1).maybeSingle();
+        if(!round){state.pollInFlight=false;return;}
+        if(!state.round||state.round.id!==round.id){
+          // Round changed — let syncState/loadRound reload calls properly.
+          state.lastSyncedRoundId=null;
+          scheduleResync('poll-round-changed');
+          state.pollInFlight=false;
+          return;
+        }
+        if(round.status!=='playing'){state.pollInFlight=false;return;}
+        const {data:calls}=await sb.from('calls')
+          .select('number,sequence').eq('round_id',round.id)
+          .order('sequence',{ascending:false}).limit(20);
+        if(!calls||!calls.length){state.pollInFlight=false;return;}
+        calls.sort((a,b)=>a.sequence-b.sequence);
+        let added=0;
+        for(const c of calls){
+          if(!state.called.has(c.number)){
+            state.called.add(c.number);state.latestNumber=c.number;added++;
+          }
+        }
+        if(added>0){
+          state.lastCallReceivedAt=Date.now();
+          renderCalled();
+          autoDaubAll();
+          // DO NOT play audio here — applyCall already handles it via realtime.
+          // Playing here causes the double-call / wrong-number bug.
+        }
+      }catch(e){console.error('[poll] error:',e);}
+      finally{state.pollInFlight=false;}
+    },2000);
   }
   function startDrawLoop(){
-    // DISABLED: server cron job owns the 4-second draw cadence.
-    // The client is a pure subscriber to public.calls.
     if(state.drawTimer)return;
-    state.drawTimer=setInterval(()=>{ /* no-op, kept for timer cleanup */ },60000);
+    const tick=async()=>{
+      if(!state.round||state.round.status!=='playing')return;
+      try{await sb.rpc('draw_number_atomic',{p_round_id:state.round.id});}catch(e){}
+    };
+    state.drawTimer=setInterval(tick,4000);
   }
   function stopDrawLoop(){
     if(state.drawTimer){clearInterval(state.drawTimer);state.drawTimer=null;}
   }
   function startCountdownLoop(){
     if(state.countdownTimer)return;
-
     state.countdownTimer=setInterval(async()=>{
-      /*
-        DISPLAY ONLY.
-
-        The browser does NOT start the round.
-        The server cron/engine owns:
-          open -> playing
-          playing -> draw
-          draw -> finish
-      */
-
       renderCountdown();
       rcineTick();
       maybeSeedBots();
-
-      if(!state.round)return;
-
-      /*
-        Once the scheduled time has arrived, simply wait for
-        the server to change rounds.status to "playing".
-
-        loadRound() / Realtime will bring that change into
-        the browser.
-      */
-      if(state.round.status==='open' &&
-         state.round.scheduled_start_at){
-
-        const serverMs=
-          Date.now() + (state.serverTimeOffset || 0);
-
-        const targetMs=
-          new Date(state.round.scheduled_start_at).getTime();
-
-        if(serverMs >= targetMs){
-          /*
-            IMPORTANT:
-            Do NOT call auto_start_round().
-            Do NOT change round status locally.
-            Do NOT start the draw loop.
-
-            Server is responsible for starting the round.
-          */
-          return;
+      if(!state.round||state.round.status!=='open')return;
+      if(!state.round.scheduled_start_at)return;
+      const serverMs=Date.now()+(state.serverTimeOffset||0);
+      const targetMs=new Date(state.round.scheduled_start_at).getTime();
+      if(serverMs<targetMs)return;
+      if(state.autoStartFiredFor===state.round.id)return;
+      state.autoStartFiredFor=state.round.id;
+      try{
+        const {data}=await sb.rpc('auto_start_round',{p_round_id:state.round.id});
+        if(data&&data.ok){
+          await loadRound();
+          startDrawLoop();
+        }else{
+          state.autoStartFiredFor=null;
         }
+      }catch(e){
+        state.autoStartFiredFor=null;
       }
     },1000);
   }
