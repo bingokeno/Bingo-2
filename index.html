@@ -2428,6 +2428,10 @@ if('speechSynthesis' in window){
     healthTimer:null,ensureTimer:null,ballTimeout:null,latestTimeout:null,
     cornerPopTimeout:null,ball3DTimeout:null,
     lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,
+    // Prevent the same server call from being presented twice when Realtime
+    // and the 1-second repair sync overlap.
+    presentedCalls:new Set(),
+    renderedLatestNumber:null,
     presentationQueue:[],presentationRunning:false,presentationStartedAt:0,
     currentlyShowingRoundId:null,lastPatternShownFor:null,
     adminSelectedPattern:'random',adminFolder:null,
@@ -2948,19 +2952,25 @@ window.AudioCaller=AudioCaller;
   }
 
   function applyCall(n,silent,sourceRoundId){
-    if(state.called.has(n))return;
-    state.called.add(n);state.latestNumber=n;state.lastCallReceivedAt=Date.now();
+    if(n==null||state.called.has(n))return;
+    state.called.add(n);
+    state.latestNumber=n;
+    state.lastCallReceivedAt=Date.now();
     renderCalled();
     const ball=$('liveBall');
-    if(ball){ball.classList.remove('burst');void ball.offsetWidth;ball.classList.add('burst');}
+    if(ball && state.renderedLatestNumber===n){
+      ball.classList.remove('burst');
+      void ball.offsetWidth;
+      ball.classList.add('burst');
+    }
     autoDaubAll();
 
-    // Only a genuine live Realtime INSERT is presented with animation + voice.
-    // Calls loaded during join/resync are recorded silently so late joiners
-    // immediately have the correct board without replaying old balls.
+    // A call may be observed by Realtime and by the 1-second repair sync.
+    // Present each server call at most once. Snapshot/resync calls stay silent.
     const roundIsPlaying=!!(state.round&&state.round.status==='playing');
     const liveChannelCall=!!(sourceRoundId&&state.round&&state.round.id===sourceRoundId);
-    if(!silent&&(roundIsPlaying||liveChannelCall)){
+    if(!silent&&(roundIsPlaying||liveChannelCall)&&!state.presentedCalls.has(n)){
+      state.presentedCalls.add(n);
       enqueueLiveCall(n);
     }
 
@@ -3299,7 +3309,8 @@ window.AudioCaller=AudioCaller;
     await syncState('enter-app');
     startCountdownLoop();startBotCheckLoop();
     startReconcileLoop();startEnsureLoop();
-    startCallPolling();
+    // Live state is refreshed by the single guarded 1-second sync loop above.
+    // Do not start a second polling loop; it can race the same DOM updates.
   }
   function updateHeaderUser(){
     $('meName').textContent=state.user.name;
@@ -3377,8 +3388,18 @@ window.AudioCaller=AudioCaller;
   async function loadPool(){
     const {data}=await sb.from('card_pool').select('*').eq('round_id',state.round.id)
       .order('slot_number',{ascending:true});
-    state.pool=data||[];
+    const nextPool=data||[];
+    // Detect actual pool/card changes before rebuilding the large card grids.
+    // This lets the live page poll every second without DOM stacking/flicker.
+    const signature=JSON.stringify(nextPool.map(c=>({
+      id:c.id,slot_number:c.slot_number,status:c.status,user_id:c.user_id,
+      is_bot:c.is_bot,marked:c.marked
+    })));
+    const changed=signature!==state.poolSignature;
+    state.poolSignature=signature;
+    state.pool=nextPool;
     state.myPaidCards=state.pool.filter(c=>c.status==='paid'&&c.user_id===state.user.id&&!c.is_bot);
+    return changed;
   }
   async function loadWinners(){
     const {data}=await sb.from('rounds').select('*').eq('status','finished')
@@ -3971,7 +3992,16 @@ window.AudioCaller=AudioCaller;
     $('liveRoundLabel').textContent=label;
     $('fsTitle').textContent='🔴 LIVE BINGO · '+label;
     const dc=displayCounts(r);
-    if(typeof SphereEngine!=='undefined')SphereEngine.onRoundChange(r);
+    // Keep the 3D Bingo machine running in place. Do not re-run its round
+    // transition logic on every one-second live refresh.
+    const sphereRoundId=r&&r.id||null;
+    const sphereStatus=r&&r.status||null;
+    if(typeof SphereEngine!=='undefined' &&
+       (state._sphereRoundId!==sphereRoundId || state._sphereStatus!==sphereStatus)){
+      state._sphereRoundId=sphereRoundId;
+      state._sphereStatus=sphereStatus;
+      SphereEngine.onRoundChange(r);
+    }
     if(!r){
       $('liveStatus').textContent='—';$('liveKartelas').textContent='0';
       $('livePrize').textContent='0';$('liveDot').innerHTML='';
@@ -4186,11 +4216,23 @@ window.AudioCaller=AudioCaller;
 
   function renderCalled(){
     const lb=$('liveBall');
+    const latest=state.latestNumber!=null?state.latestNumber:null;
+    const changed=latest!==state.renderedLatestNumber;
     if(lb){
-      if(state.latestNumber!=null){lb.textContent=state.latestNumber;
-        lb.classList.remove('new');void lb.offsetWidth;lb.classList.add('new');}
-      else lb.textContent='–';
+      if(latest!=null){
+        lb.textContent=latest;
+        // Animate only when the server actually reports a new number.
+        if(changed){
+          lb.classList.remove('new');
+          void lb.offsetWidth;
+          lb.classList.add('new');
+        }
+      }else{
+        lb.textContent='–';
+        lb.classList.remove('new');
+      }
     }
+    state.renderedLatestNumber=latest;
     renderLast5Numbers();
     renderBoards();
   }
@@ -5023,38 +5065,86 @@ window.AudioCaller=AudioCaller;
     },250);
   }
   async function syncState(reason){
+    // ONE authoritative live-sync path. Realtime is still used for speed,
+    // but this guarded 1-second sync repairs missed events without allowing
+    // multiple refresh loops to repaint/stack the same live UI.
+    if(state.liveSyncInFlight)return;
+    state.liveSyncInFlight=true;
     try{
       const {data:round,error:rErr}=await sb.from('rounds').select('*')
         .in('status',['open','playing'])
         .order('created_at',{ascending:false}).limit(1).maybeSingle();
       if(rErr)throw rErr;
+
       const newRoundId=round&&round.id;
-      if(newRoundId!==state.lastSyncedRoundId){
+      const roundChanged=newRoundId!==state.lastSyncedRoundId;
+
+      if(roundChanged){
         state.lastSyncedRoundId=newRoundId;
         state.autoStartFiredFor=null;
+        // Never carry called/presented numbers from the previous round.
+        state.called=new Set();
+        state.presentedCalls=new Set();
+        state.latestNumber=null;
+        state.renderedLatestNumber=null;
+        state.poolSignature=null;
+        state._sphereRoundId=null;
+        state._sphereStatus=null;
         teardownRealtimeChannels();
         if(newRoundId)setupRoundChannels(newRoundId);
         else setupIdleChannels();
         syncServerTime();
       }
+
       state.round=round;
       if(round){
         const {data:calls,error:cErr}=await sb.from('calls')
           .select('number,sequence').eq('round_id',round.id)
           .order('sequence',{ascending:true});
         if(cErr)throw cErr;
-        let added=0;
+
+        // The first snapshot for a round is state-only. Realtime handles the
+        // live presentation; the 1-second sync only repairs missed calls.
         for(const c of (calls||[])){
-          if(!state.called.has(c.number)){applyCall(c.number,true);added++;}
+          if(!state.called.has(c.number)){
+            applyCall(c.number,true,round.id);
+          }
         }
         state.latestNumber=(calls||[]).length?calls[calls.length-1].number:null;
-        renderCalled();renderBoards();
-        await loadPool();
-        renderSlotGrid();renderMyCards();
-        renderRound();renderCountdown();renderPattern();
+
+        // Update the existing live DOM in place. These render functions only
+        // change text/classes; they do not append another machine or board.
+        renderRound();
+        renderCalled();
+        renderCountdown();
+        renderPattern();
+        const poolChanged=await loadPool();
+        if(poolChanged){
+          renderSlotGrid();
+          renderMyCards();
+        }
         if(round.status==='open')showPatternModal(round);
+      }else{
+        state.called=new Set();
+        state.presentedCalls=new Set();
+        state.pool=[];
+        state.myPaidCards=[];
+        state.latestNumber=null;
+        state.renderedLatestNumber=null;
+        state.poolSignature=null;
+        state._sphereRoundId=null;
+        state._sphereStatus=null;
+        renderCalled();
+        renderBoards();
+        renderRound();
+        renderCountdown();
+        renderPattern();
       }
-    }catch(e){console.error('[sync] resync error:',e);}
+    }catch(e){
+      console.error('[sync] resync error:',e);
+    }finally{
+      state.liveSyncInFlight=false;
+    }
   }
   function setupRoundChannels(roundId){
     state.channels.push(sb.channel('rt-round-'+roundId)
@@ -5145,45 +5235,9 @@ window.AudioCaller=AudioCaller;
     },1000);
   }
   function startCallPolling(){
-    if(state.callPollTimer)return;
-    state.callPollTimer=setInterval(async()=>{
-      if(document.hidden)return;
-      if(state.pollInFlight)return;
-      state.pollInFlight=true;
-      try{
-        const {data:round}=await sb.from('rounds').select('*')
-          .in('status',['open','playing'])
-          .order('created_at',{ascending:false}).limit(1).maybeSingle();
-        if(!round){state.pollInFlight=false;return;}
-        if(!state.round||state.round.id!==round.id){
-          // Round changed — let syncState/loadRound reload calls properly.
-          state.lastSyncedRoundId=null;
-          scheduleResync('poll-round-changed');
-          state.pollInFlight=false;
-          return;
-        }
-        if(round.status!=='playing'){state.pollInFlight=false;return;}
-        const {data:calls}=await sb.from('calls')
-          .select('number,sequence').eq('round_id',round.id)
-          .order('sequence',{ascending:false}).limit(20);
-        if(!calls||!calls.length){state.pollInFlight=false;return;}
-        calls.sort((a,b)=>a.sequence-b.sequence);
-        let added=0;
-        for(const c of calls){
-          if(!state.called.has(c.number)){
-            // Use the same live-call pipeline as Realtime so the board,
-            // current ball, daubing and presentation all keep advancing.
-            applyCall(c.number,false,round.id);
-            added++;
-          }
-        }
-        if(added>0){
-          renderCalled();
-          renderBoards();
-        }
-      }catch(e){console.error('[poll] error:',e);}
-      finally{state.pollInFlight=false;}
-    },1000);
+    // DISABLED: startReconcileLoop() owns the single guarded 1-second live
+    // refresh. Keeping a second timer here causes competing renders.
+    return;
   }
   function startDrawLoop(){
     // DISABLED: server cron job owns the 4-second draw cadence.
