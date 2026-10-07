@@ -5082,12 +5082,10 @@ window.AudioCaller=AudioCaller;
     },250);
   }
   async function syncState(reason){
-    // ONE authoritative live-sync path. Realtime is still used for speed,
-    // but this guarded 1-second sync repairs missed events without allowing
-    // multiple refresh loops to repaint/stack the same live UI.
     if(state.liveSyncInFlight)return;
     state.liveSyncInFlight=true;
     try{
+      // 1. Fetch the current round
       const {data:round,error:rErr}=await sb.from('rounds').select('*')
         .in('status',['open','playing'])
         .order('created_at',{ascending:false}).limit(1).maybeSingle();
@@ -5099,7 +5097,7 @@ window.AudioCaller=AudioCaller;
       if(roundChanged){
         state.lastSyncedRoundId=newRoundId;
         state.autoStartFiredFor=null;
-        // Never carry called/presented numbers from the previous round.
+        // Clear old data ONLY when we are sure it's a new round
         state.called=new Set();
         state.presentedCalls=new Set();
         state.latestNumber=null;
@@ -5114,50 +5112,46 @@ window.AudioCaller=AudioCaller;
       }
 
       state.round=round;
-
-      // If the scheduled start has passed while the server still reports
-      // "open", immediately request another authoritative sync. The countdown
-      // renderer already presents LIVE during this short server-status window.
-      if(round && round.status==='open' && round.scheduled_start_at){
-        const serverMs=Date.now()+(state.serverTimeOffset||0);
-        const scheduledMs=new Date(round.scheduled_start_at).getTime();
-        if(scheduledMs<=serverMs && !state._forceStartResyncPending){
-          state._forceStartResyncPending=true;
-          setTimeout(()=>{
-            state._forceStartResyncPending=false;
-            syncState('sync-open-expired').catch(()=>{});
-          },1000);
-        }
-      }
-
       if(round){
+        // 2. ALWAYS fetch the calls for this round, even if we just synced it.
+        // This fixes the "CALLED: --" bug because we don't rely on realtime
+        // to populate the board on initial load or after a refresh.
         const {data:calls,error:cErr}=await sb.from('calls')
           .select('number,sequence').eq('round_id',round.id)
           .order('sequence',{ascending:true});
         if(cErr)throw cErr;
 
-        // The first snapshot for a round is state-only. Realtime handles the
-        // live presentation; the 1-second sync only repairs missed calls.
+        // 3. Apply the calls. If it's a new round, this populates the board.
+        // If it's the same round, this ensures the board is up to date.
         for(const c of (calls||[])){
           if(!state.called.has(c.number)){
-            applyCall(c.number,true,round.id);
+            applyCall(c.number, true, round.id); // silent = true to prevent animation on sync
           }
         }
-        state.latestNumber=(calls||[]).length?calls[calls.length-1].number:null;
 
-        // Update the existing live DOM in place. These render functions only
-        // change text/classes; they do not append another machine or board.
+        // Ensure the latest number is set correctly
+        if((calls||[]).length > 0) {
+          state.latestNumber = calls[calls.length-1].number;
+        }
+
+        // 4. Update the UI
         renderRound();
         renderCalled();
         renderCountdown();
         renderPattern();
+
+        // 5. Update the pool (cards)
         const poolChanged=await loadPool();
         if(poolChanged){
           renderSlotGrid();
           renderMyCards();
         }
-        if(round.status==='open')showPatternModal(round);
-      }else{
+
+        // 6. Show pattern modal if it's a new open round
+        if(round.status==='open') showPatternModal(round);
+
+      } else {
+        // No round found
         state.called=new Set();
         state.presentedCalls=new Set();
         state.pool=[];
