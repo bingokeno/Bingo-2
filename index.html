@@ -2953,7 +2953,7 @@ window.AudioCaller=AudioCaller;
 
   function applyCall(n,silent,sourceRoundId){
     if(n==null||state.called.has(n))return;
-    state.called.add(n);
+    state.called.add(n);\n    console.log(`[call] number=${n} called=${state.called.size} queued=${state.presentationQueue.length}`);
     state.latestNumber=n;
     state.lastCallReceivedAt=Date.now();
     renderCalled();
