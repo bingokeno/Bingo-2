@@ -2959,7 +2959,23 @@ window.AudioCaller=AudioCaller;
   }
 
   function applyCall(n,silent,sourceRoundId){
-    if(n==null||state.called.has(n))return;
+    if(n==null)return;
+
+    // HARD GUARD: reject any call that does not belong to the active round.
+    // This is what stops the ghost-numbers bug — a call from Round #2189
+    // can never be applied to Round #2190's board.
+    if(sourceRoundId && state.round && sourceRoundId !== state.round.id){
+      console.warn('[applyCall] rejected stale call', n,
+                   'from round', sourceRoundId,
+                   'active round is', state.round.id);
+      return;
+    }
+    if(sourceRoundId && !state.round){
+      console.warn('[applyCall] rejected call with no active round', n);
+      return;
+    }
+
+    if(state.called.has(n))return;
     state.called.add(n);
     console.log(`[call] number=${n} called=${state.called.size} queued=${state.presentationQueue.length}`);
     state.latestNumber=n;
@@ -2973,8 +2989,6 @@ window.AudioCaller=AudioCaller;
     }
     autoDaubAll();
 
-    // A call may be observed by Realtime and by the 1-second repair sync.
-    // Present each server call at most once. Snapshot/resync calls stay silent.
     const roundIsPlaying=!!(state.round&&state.round.status==='playing');
     const liveChannelCall=!!(sourceRoundId&&state.round&&state.round.id===sourceRoundId);
     if(!silent&&(roundIsPlaying||liveChannelCall)&&!state.presentedCalls.has(n)){
@@ -3380,16 +3394,39 @@ window.AudioCaller=AudioCaller;
   async function loadRound(){
     const {data}=await sb.from('rounds').select('*').in('status',['open','playing'])
       .order('created_at',{ascending:false}).limit(1).maybeSingle();
-    state.round=data;
+
+    const fetchedRoundId = data && data.id;
+    state.round = data;
+
     if(state.round){
       const {data:calls}=await sb.from('calls').select('number,sequence')
-        .eq('round_id',state.round.id).order('sequence',{ascending:true});
-      state.called=new Set((calls||[]).map(c=>c.number));
-      state.latestNumber=(calls||[]).length?calls[calls.length-1].number:null;
+        .eq('round_id',fetchedRoundId).order('sequence',{ascending:true});
+
+      // HARD GUARD: if the active round changed while we were awaiting,
+      // discard this fetch entirely. Never let old calls leak onto a
+      // different round's board.
+      if(!state.round || state.round.id !== fetchedRoundId){
+        console.warn('[loadRound] round changed during fetch — discarding');
+        return;
+      }
+
+      // REBUILD FROM SCRATCH. Never merge into the existing Set.
+      state.called = new Set((calls||[]).map(c=>c.number));
+      state.presentedCalls = new Set(state.called);
+      state.latestNumber = (calls||[]).length ? calls[calls.length-1].number : null;
+      state.renderedLatestNumber = null;
+
       await loadPool();
       maybeSeedBots();
       if(state.round.status==='open')showPatternModal(state.round);
-    }else{state.called=new Set();state.pool=[];state.myPaidCards=[];state.latestNumber=null;}
+    }else{
+      state.called=new Set();
+      state.presentedCalls=new Set();
+      state.pool=[];
+      state.myPaidCards=[];
+      state.latestNumber=null;
+      state.renderedLatestNumber=null;
+    }
     renderRound();renderCalled();renderSlotGrid();renderMyCards();
     renderBoards();renderCountdown();renderPattern();
   }
@@ -5121,25 +5158,26 @@ window.AudioCaller=AudioCaller;
 
       state.round=round;
       if(round){
-        // 2. ALWAYS fetch the calls for this round, even if we just synced it.
-        // This fixes the "CALLED: --" bug because we don't rely on realtime
-        // to populate the board on initial load or after a refresh.
+        const fetchedRoundId = round.id;
+
+        // 2. ALWAYS fetch the calls for this round.
         const {data:calls,error:cErr}=await sb.from('calls')
-          .select('number,sequence').eq('round_id',round.id)
+          .select('number,sequence').eq('round_id',fetchedRoundId)
           .order('sequence',{ascending:true});
         if(cErr)throw cErr;
 
-        // 3. Apply the calls. If it's a new round, this populates the board.
-        // If it's the same round, this ensures the board is up to date.
-        for(const c of (calls||[])){
-          if(!state.called.has(c.number)){
-            applyCall(c.number, true, round.id); // silent = true to prevent animation on sync
-          }
-        }
-
-        // Ensure the latest number is set correctly
-        if((calls||[]).length > 0) {
-          state.latestNumber = calls[calls.length-1].number;
+        // HARD GUARD: if the active round changed during the fetch,
+        // do not apply anything. The next sync tick will handle the new round.
+        if(!state.round || state.round.id !== fetchedRoundId){
+          console.warn('[syncState] round changed during calls fetch — skipping apply');
+        } else {
+          // 3. REBUILD FROM SCRATCH. Never merge into the existing Set.
+          // This is the fix that stops ghost numbers appearing on a fresh board.
+          const freshSet = new Set((calls||[]).map(c=>c.number));
+          state.called = freshSet;
+          state.presentedCalls = new Set(freshSet);
+          state.latestNumber = (calls||[]).length ? calls[calls.length-1].number : null;
+          state.renderedLatestNumber = null;
         }
 
         // 4. Update the UI
@@ -5149,15 +5187,6 @@ window.AudioCaller=AudioCaller;
         renderPattern();
 
         // 5. Update the pool (cards)
-        const poolChanged=await loadPool();
-        if(poolChanged){
-          renderSlotGrid();
-          renderMyCards();
-        }
-
-        // 6. Show pattern modal if it's a new open round
-        if(round.status==='open') showPatternModal(round);
-
       } else {
         // No round found
         state.called=new Set();
