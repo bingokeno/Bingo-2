@@ -5171,15 +5171,15 @@ window.AudioCaller=AudioCaller;
         let added=0;
         for(const c of calls){
           if(!state.called.has(c.number)){
-            state.called.add(c.number);state.latestNumber=c.number;added++;
+            // Use the same live-call pipeline as Realtime so the board,
+            // current ball, daubing and presentation all keep advancing.
+            applyCall(c.number,false,round.id);
+            added++;
           }
         }
         if(added>0){
-          state.lastCallReceivedAt=Date.now();
           renderCalled();
-          autoDaubAll();
-          // DO NOT play audio here — applyCall already handles it via realtime.
-          // Playing here causes the double-call / wrong-number bug.
+          renderBoards();
         }
       }catch(e){console.error('[poll] error:',e);}
       finally{state.pollInFlight=false;}
