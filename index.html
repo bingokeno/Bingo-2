@@ -3305,11 +3305,11 @@ window.AudioCaller=AudioCaller;
     showScreen('screen-home');
     updateGlobalCountdownVisibility();
     await syncServerTime();
-    await ensureRound();
+    await loadRound();
     await loadAll();
     await syncState('enter-app');
     startCountdownLoop();startDrawLoop();startBotCheckLoop();
-    startReconcileLoop();startEnsureLoop();
+    startReconcileLoop();
     startCallPolling();
   }
   function updateHeaderUser(){
@@ -3336,24 +3336,11 @@ window.AudioCaller=AudioCaller;
   });
 
   async function ensureRound(){
-    try{
-      const {data:existing}=await sb.from('rounds').select('id')
-        .in('status',['open','playing'])
-        .order('created_at',{ascending:false}).limit(1).maybeSingle();
-      if(existing&&existing.id){await loadRound();return;}
-      try{
-        const {data,error}=await sb.rpc('create_new_round');
-        if(error)console.warn('create_new_round:',error.message);
-      }catch(e){console.warn('create_new_round threw:',e.message);}
-      await loadRound();
-    }catch(e){console.error('ensureRound:',e);try{await loadRound();}catch(_){}}
+    // SERVER AUTHORITY: the database/pg_cron creates the next round.
+    // The client only refreshes state and never creates rounds on its own.
+    await loadRound();
   }
-  function startEnsureLoop(){
-    if(state.ensureTimer)return;
-    state.ensureTimer=setInterval(async()=>{
-      if(!state.round||state.round.status==='finished')await ensureRound();
-    },5000);
-  }
+
   async function loadAll(){
     await loadRound();await loadWinners();await loadWallet();
     if(state.user.is_admin){
@@ -3417,7 +3404,6 @@ window.AudioCaller=AudioCaller;
       }
 
       await loadPool();
-      maybeSeedBots();
       if(state.round.status==='open')showPatternModal(state.round);
     }else{
       stopDrawLoop();
@@ -3430,8 +3416,12 @@ window.AudioCaller=AudioCaller;
     renderBoards();renderCountdown();renderPattern();
   }
   async function loadPool(){
-    const {data}=await sb.from('card_pool').select('*').eq('round_id',state.round.id)
-      .order('slot_number',{ascending:true});
+    if(!state.round)return;
+    const {data}=await sb.from('card_pool')
+      .select('id,round_id,slot_number,numbers,status,is_bot,user_id,user_name,marked,won')
+      .eq('round_id',state.round.id)
+      .order('slot_number',{ascending:true})
+      .limit(500);
     state.pool=data||[];
     state.myPaidCards=state.pool.filter(c=>c.status==='paid'&&c.user_id===state.user.id&&!c.is_bot);
   }
@@ -3844,7 +3834,9 @@ window.AudioCaller=AudioCaller;
     if(!confirm('Finish current round and open a new one (random pattern)?'))return;
     await sb.from('rounds').update({status:'finished',ended_at:new Date().toISOString()})
       .in('status',['open','playing']);
-    await ensureRound();
+    const {error}=await sb.rpc('create_new_round');
+    if(error) return alert('Error creating new round: '+error.message);
+    await loadRound();
     alert('New round opened');
   }
 
@@ -3866,7 +3858,7 @@ window.AudioCaller=AudioCaller;
       const {data,error}=await sb.rpc('auto_start_round',{p_round_id:state.round.id});
       if(error)return alert('Error: '+error.message);
       if(!data.ok)return alert('Cannot start: '+data.reason);
-      await loadRound();startDrawLoop();
+      await loadRound();
       alert('Started.');
     };
   }
@@ -4083,48 +4075,8 @@ window.AudioCaller=AudioCaller;
     return {entry,players,money,commission,prize,realPlayers,botCards,shownBots};
   }
 
-  let _botSeedInFlight=false,_botSeedTries=0,_botSeedRoundId=null;
-  async function seedBotsForRound(roundId){
-    try{
-      const {data,error}=await sb.rpc('bot_join_tick',{p_round_id:roundId});
-      if(error){console.warn('seed_bots:',error.message);return false;}
-      if(data&&data.ok){
-        if(state.round&&state.round.id===roundId){
-          await loadPool();
-          renderSlotGrid();renderMyCards();renderRound();
-          renderPlayersPanel(state.round);renderBoards();
-        }
-        return true;
-      }
-      return false;
-    }catch(e){console.warn('seed_bots threw:',e.message);return false;}
-  }
-  async function maybeSeedBots(){
-    const r=state.round;
-    if(!r||_botSeedInFlight)return;
-    if(state.botsSeededFor===r.id)return;
-    if((state.pool||[]).some(c=>c.is_bot)){state.botsSeededFor=r.id;return;}
-
-    if(_botSeedRoundId!==r.id){_botSeedRoundId=r.id;_botSeedTries=0;}
-    if(_botSeedTries>=5){state.botsSeededFor=r.id;return;}
-
-    let due=false;
-    if(r.status==='playing')due=true;
-    else if(r.status==='open'){
-      if(!r.scheduled_start_at)due=true;
-      else{
-        const serverMs=Date.now()+(state.serverTimeOffset||0);
-        const targetMs=new Date(r.scheduled_start_at).getTime();
-        if((targetMs-serverMs)/1000<=2)due=true;
-      }
-    }
-    if(!due)return;
-
-    _botSeedInFlight=true;_botSeedTries++;
-    const ok=await seedBotsForRound(r.id);
-    _botSeedInFlight=false;
-    if(ok)state.botsSeededFor=r.id;
-  }
+  // Bot population is server-controlled by tick_bingo_engine()/tick_round().
+  function maybeSeedBots(){ return; }
 
   function renderPlayersPanel(r){
     if(!r){
@@ -5267,7 +5219,6 @@ window.AudioCaller=AudioCaller;
     state.countdownTimer=setInterval(async()=>{
       renderCountdown();
       rcineTick();
-      maybeSeedBots();
       if(!state.round||state.round.status!=='open')return;
       // Countdown is display-only. The server starts the round at
       // scheduled_start_at through tick_bingo_engine().
