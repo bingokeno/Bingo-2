@@ -2428,7 +2428,7 @@ if('speechSynthesis' in window){
     healthTimer:null,ensureTimer:null,ballTimeout:null,latestTimeout:null,
     cornerPopTimeout:null,ball3DTimeout:null,
     lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,
-    presentationQueue:[],presentationRunning:false,presentationStartedAt:0,
+    presentationQueue:[],presentationRunning:false,presentationStartedAt:0,presentationEpoch:0,
     currentlyShowingRoundId:null,lastPatternShownFor:null,
     adminSelectedPattern:'random',adminFolder:null,
     resyncTimer:null,reconcileTimer:null,poolDebounce:null,
@@ -2908,8 +2908,9 @@ window.AudioCaller=AudioCaller;
   async function runPresentationQueue(){
     if(state.presentationRunning)return;
     state.presentationRunning=true;
+    const epoch=state.presentationEpoch||0;
     try{
-      while(state.presentationQueue.length){
+      while(state.presentationQueue.length && epoch===(state.presentationEpoch||0)){
         const n=state.presentationQueue.shift();
         const started=performance.now();
         state.presentationStartedAt=Date.now();
@@ -3060,10 +3061,15 @@ window.AudioCaller=AudioCaller;
     if(state.currentlyShowingRoundId===r.id)return;
     state.currentlyShowingRoundId=r.id;
     let cardData=null,shownPlayers=null,winPrize=null;
+    let winnerCalled=new Set();
     try{
-      const {data:allCards}=await sb.from('card_pool').select('*').eq('round_id',r.id);
+      const [{data:allCards},{data:roundCalls}]=await Promise.all([
+        sb.from('card_pool').select('*').eq('round_id',r.id),
+        sb.from('calls').select('number').eq('round_id',r.id)
+      ]);
       const cards=allCards||[];
       cardData=cards.find(c=>c.slot_number===r.winner_slot)||null;
+      winnerCalled=new Set((roundCalls||[]).map(c=>c.number));
       const dc=displayCounts(r,cards);
       shownPlayers=dc.players;
       winPrize=dc.prize;
@@ -3082,12 +3088,12 @@ window.AudioCaller=AudioCaller;
       card.appendChild(header);
       const g=document.createElement('div');g.className='grid';
       const nums=cardData.numbers;
-      const lineIdx=findWinningCells(r.pattern,nums,state.called);
+      const lineIdx=findWinningCells(r.pattern,nums,winnerCalled);
       for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){
         const idx=rr*5+cc,val=nums[idx];
         const cell=document.createElement('div');cell.className='cell';
         if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}
-        else{cell.textContent=val;if(state.called.has(val))cell.classList.add('hit');}
+        else{cell.textContent=val;if(winnerCalled.has(val))cell.classList.add('hit');}
         if(lineIdx.includes(idx))cell.classList.add('winline');
         g.appendChild(cell);
       }
@@ -3363,24 +3369,42 @@ window.AudioCaller=AudioCaller;
     const {data}=await sb.from('users').select('*').eq('id',state.user.id).maybeSingle();
     if(data){state.user=data;updateHeaderUser();}
   }
+  function resetRoundClientState(nextRoundId){
+    // A round is a hard state boundary. Never carry called numbers or queued
+    // presentations from the previous round into the new round.
+    state.called=new Set();
+    state.presentedCalls=new Set();
+    state.presentationQueue=[];
+    state.presentationEpoch=(state.presentationEpoch||0)+1;
+    state.latestNumber=null;
+    state.renderedLatestNumber=null;
+    state.lastCallReceivedAt=0;
+    state.botsSeededFor=null;
+    console.log('[round] client state reset for',nextRoundId);
+  }
+
   async function loadRound(){
     const {data}=await sb.from('rounds').select('*').in('status',['open','playing'])
       .order('created_at',{ascending:false}).limit(1).maybeSingle();
 
     const fetchedRoundId = data && data.id;
+    const previousRoundId=state.round&&state.round.id;
+    if(fetchedRoundId!==previousRoundId){
+      resetRoundClientState(fetchedRoundId);
+      state.autoStartFiredFor=null;
+      state.lastSyncedRoundId=fetchedRoundId||null;
+    }
     state.round = data;
 
     if(state.round){
       const {data:calls}=await sb.from('calls').select('number,sequence')
         .eq('round_id',fetchedRoundId).order('sequence',{ascending:true});
 
-      // If the active round changed while we were awaiting, discard.
       if(!state.round || state.round.id !== fetchedRoundId){
         return;
       }
 
-      // REBUILD. Never merge.
-      // MERGE. Do not rebuild.
+      // Hydrate/reconcile from the server without erasing a live Realtime call.
       const serverSet = new Set((calls||[]).map(c=>c.number));
       for(const n of serverSet){
         if(!state.called.has(n)){
@@ -3388,14 +3412,15 @@ window.AudioCaller=AudioCaller;
           state.presentedCalls.add(n);
         }
       }
-      if((calls||[]).length){
-        state.latestNumber = calls[calls.length-1].number;
+      if((calls||[]).length && (!state.latestNumber || !state.called.has(state.latestNumber))){
+        state.latestNumber=calls[calls.length-1].number;
       }
 
       await loadPool();
       maybeSeedBots();
       if(state.round.status==='open')showPatternModal(state.round);
     }else{
+      stopDrawLoop();
       state.called=new Set();
       state.presentedCalls=new Set();
       state.pool=[];state.myPaidCards=[];state.latestNumber=null;
@@ -3830,7 +3855,7 @@ window.AudioCaller=AudioCaller;
       if(pat==='random'){await forceOpenNewRound();return;}
       if(!confirm('Open new round with pattern: '+(PATTERN_LABEL[pat]||pat)+'?'))return;
       const {data,error}=await sb.rpc('open_round_with_pattern',
-        {p_pattern:pat,p_price:10,p_interval:3000});
+        {p_pattern:pat,p_price:10,p_interval:4000});
       if(error)return alert('Error: '+error.message);
       await loadRound();
       alert('Round #'+data.round_number+' opened with '+PATTERN_LABEL[pat]);
@@ -5053,16 +5078,29 @@ window.AudioCaller=AudioCaller;
         .order('created_at',{ascending:false}).limit(1).maybeSingle();
       if(rErr)throw rErr;
       const newRoundId=round&&round.id;
-      if(newRoundId!==state.lastSyncedRoundId){
+      const previousRoundId=state.lastSyncedRoundId;
+      if(newRoundId!==previousRoundId){
         state.lastSyncedRoundId=newRoundId;
         state.autoStartFiredFor=null;
+        resetRoundClientState(newRoundId);
         teardownRealtimeChannels();
         if(newRoundId)setupRoundChannels(newRoundId);
         else setupIdleChannels();
         syncServerTime();
+
+        if(previousRoundId && newRoundId){
+          sb.from('rounds').select('*').eq('id',previousRoundId).eq('status','finished')
+            .maybeSingle().then(({data:finished})=>{
+              const recent=finished&&finished.ended_at &&
+                (Date.now()-new Date(finished.ended_at).getTime())<30000;
+              if(recent&&finished.winner_name)showWinner(finished);
+            }).catch(()=>{});
+        }
       }
       state.round=round;
       if(round){
+        if(round.status==='playing')startDrawLoop();
+        else if(round.status==='open')stopDrawLoop();
         const fetchedRoundId = round.id;
 
         const {data:calls,error:cErr}=await sb.from('calls')
@@ -5074,8 +5112,9 @@ window.AudioCaller=AudioCaller;
         if(!state.round || state.round.id !== fetchedRoundId){
           console.warn('[syncState] round changed during calls fetch — skipping apply');
         } else {
-          // MERGE. Do not rebuild — rebuilding would erase any Realtime
-          // calls that arrived while this fetch was in flight.
+              // Merge the authoritative snapshot without erasing a Realtime call
+          // that arrived while this request was in flight. Round changes already
+          // reset state, so this cannot leak calls from the previous round.
           const serverSet = new Set((calls||[]).map(c=>c.number));
           for(const n of serverSet){
             if(!state.called.has(n)){
@@ -5083,8 +5122,8 @@ window.AudioCaller=AudioCaller;
               state.presentedCalls.add(n);
             }
           }
-          if((calls||[]).length){
-            state.latestNumber = calls[calls.length-1].number;
+          if((calls||[]).length && (!state.latestNumber || !state.called.has(state.latestNumber))){
+            state.latestNumber=calls[calls.length-1].number;
           }
         }
 
@@ -5207,28 +5246,18 @@ window.AudioCaller=AudioCaller;
         calls.sort((a,b)=>a.sequence-b.sequence);
         let added=0;
         for(const c of calls){
-          if(!state.called.has(c.number)){
-            state.called.add(c.number);state.latestNumber=c.number;added++;
-          }
+          if(!state.called.has(c.number))added++;
+          applyCall(c.number,false,round.id);
         }
-        if(added>0){
-          state.lastCallReceivedAt=Date.now();
-          renderCalled();
-          autoDaubAll();
-          // DO NOT play audio here — applyCall already handles it via realtime.
-          // Playing here causes the double-call / wrong-number bug.
-        }
+        if(added>0)state.lastCallReceivedAt=Date.now();
       }catch(e){console.error('[poll] error:',e);}
       finally{state.pollInFlight=false;}
     },2000);
   }
   function startDrawLoop(){
-    if(state.drawTimer)return;
-    const tick=async()=>{
-      if(!state.round||state.round.status!=='playing')return;
-      try{await sb.rpc('draw_number_atomic',{p_round_id:state.round.id});}catch(e){}
-    };
-    state.drawTimer=setInterval(tick,4000);
+    // Drawing is server-driven by pg_cron -> tick_bingo_engine().
+    // The client only renders Realtime calls; it never creates game numbers.
+    stopDrawLoop();
   }
   function stopDrawLoop(){
     if(state.drawTimer){clearInterval(state.drawTimer);state.drawTimer=null;}
@@ -5240,23 +5269,8 @@ window.AudioCaller=AudioCaller;
       rcineTick();
       maybeSeedBots();
       if(!state.round||state.round.status!=='open')return;
-      if(!state.round.scheduled_start_at)return;
-      const serverMs=Date.now()+(state.serverTimeOffset||0);
-      const targetMs=new Date(state.round.scheduled_start_at).getTime();
-      if(serverMs<targetMs)return;
-      if(state.autoStartFiredFor===state.round.id)return;
-      state.autoStartFiredFor=state.round.id;
-      try{
-        const {data}=await sb.rpc('auto_start_round',{p_round_id:state.round.id});
-        if(data&&data.ok){
-          await loadRound();
-          startDrawLoop();
-        }else{
-          state.autoStartFiredFor=null;
-        }
-      }catch(e){
-        state.autoStartFiredFor=null;
-      }
+      // Countdown is display-only. The server starts the round at
+      // scheduled_start_at through tick_bingo_engine().
     },1000);
   }
   function startBotCheckLoop(){
