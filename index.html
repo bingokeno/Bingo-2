@@ -1896,9 +1896,11 @@
           <span class="wi-icon">💰</span>
           <input id="depositAmount" placeholder="Amount (min 100 birr)" inputmode="numeric" />
         </div>
-        <div class="wallet-input-row">
-          <span class="wi-icon">🔖</span>
-          <input id="depositRef" placeholder="Telebirr reference (from SMS)" />
+        <div class="wallet-input-row" style="align-items:flex-start">
+          <span class="wi-icon" style="top:12px">📩</span>
+          <textarea id="depositSms"
+            placeholder="Paste the Telebirr confirmation SMS you received after sending"
+            rows="3" style="padding:14px 14px 14px 42px;font-family:monospace;font-size:.78rem;resize:vertical"></textarea>
         </div>
 
         <button id="btnDeposit" class="ws-submit">💳 REQUEST DEPOSIT</button>
@@ -1922,7 +1924,6 @@
       <div class="wallet-section withdraw"><div class="ws-header"><div class="ws-badge">⬆️</div><div><div class="ws-title">Withdraw</div><div class="ws-desc">Send winnings to your Telebirr number</div></div></div>
         <div class="wallet-input-row"><span class="wi-icon">💰</span><input id="withdrawAmount" placeholder="Amount (min 50 birr)" inputmode="numeric" /></div>
         <div class="wallet-input-row"><span class="wi-icon">📱</span><input id="withdrawRef" placeholder="Your Telebirr number" inputmode="tel" /></div>
-        <div class="wallet-input-row" style="align-items:flex-start"><span class="wi-icon" style="top:12px">📩</span><textarea id="withdrawSms" placeholder="Paste the Telebirr confirmation SMS you received" rows="3" style="padding:14px 14px 14px 42px;font-family:monospace;font-size:.78rem;resize:vertical"></textarea></div>
         <button id="btnWithdraw" class="ws-submit">💸 REQUEST WITHDRAWAL</button><div id="withdrawCooldown" style="display:none;text-align:center;padding:8px;border-radius:10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;font-size:.72rem;font-weight:800;margin-top:8px"></div>
       </div>
 
@@ -4226,21 +4227,74 @@ window.AudioCaller=AudioCaller;
   function updateSelBar(){
     $('selCount').textContent='1';
   }
-  $('btnDeposit').onclick=async()=>{
-    const amount=parseFloat($('depositAmount').value);
-    const ref=$('depositRef').value.trim();
-    if(!amount||amount<MIN_DEPOSIT)return setMsg('walletMsg',
-      'Minimum deposit is '+MIN_DEPOSIT+' birr','var(--danger)');
-    setMsg('walletMsg','Submitting…','var(--accent)');
-    const {data,error}=await sb.rpc('request_deposit',
-      {p_user_id:state.user.id,p_amount:amount,p_reference:ref||null});
-    if(error)return setMsg('walletMsg','Error: '+error.message,'var(--danger)');
-    if(!data.ok){if(data.reason==='too_soon')return setMsg('walletMsg','Please wait '+(data.wait_seconds||180)+'s before another deposit.','var(--danger)');return setMsg('walletMsg',data.reason,'var(--danger)');}
-    setMsg('walletMsg','✅ Request sent. Pay '+amount+' birr to Telebirr '+TELEBIRR,'var(--mark)');
-    $('depositAmount').value='';$('depositRef').value='';
-    await loadWallet();
+  $('btnDeposit').onclick = async () => {
+    const amount = parseFloat($('depositAmount').value);
+    const sms = $('depositSms').value.trim();
+
+    if (!amount || amount < MIN_DEPOSIT)
+      return setMsg('walletMsg', 'Minimum deposit is ' + MIN_DEPOSIT + ' birr', 'var(--danger)');
+    if (!sms || sms.length < 10)
+      return setMsg('walletMsg', 'Paste the Telebirr SMS you received after sending', 'var(--danger)');
+
+    setMsg('walletMsg', 'Submitting…', 'var(--accent)');
+
+    const {data, error} = await sb.rpc('request_deposit', {
+      p_user_id: state.user.id,
+      p_amount: amount,
+      p_reference: null,
+      p_sms_text: sms
+    });
+
+    if (error) return setMsg('walletMsg', 'Error: ' + error.message, 'var(--danger)');
+    if (!data.ok) {
+      if (data.reason === 'too_soon')
+        return setMsg('walletMsg', 'Please wait ' + (data.wait_seconds||180) + 's before another deposit.', 'var(--danger)');
+      if (data.reason === 'missing_sms')
+        return setMsg('walletMsg', 'Paste the Telebirr SMS first', 'var(--danger)');
+      return setMsg('walletMsg', data.reason, 'var(--danger)');
+    }
+
+    setMsg('walletMsg', '✅ Request sent. Admin will verify and approve.', 'var(--mark)');
+    $('depositAmount').value = '';
+    $('depositSms').value = '';
+    await Promise.all([loadUser(), loadWallet()]);
   };
-  $('btnWithdraw').onclick=async()=>{const amount=parseFloat($('withdrawAmount').value),ref=$('withdrawRef').value.trim(),sms=$('withdrawSms').value.trim();if(!amount||amount<MIN_WITHDRAW)return setMsg('walletMsg','Minimum withdraw is '+MIN_WITHDRAW+' birr','var(--danger)');if(!ref)return setMsg('walletMsg','Enter your Telebirr number','var(--danger)');if(!sms||sms.length<10)return setMsg('walletMsg','Paste the Telebirr SMS you received','var(--danger)');setMsg('walletMsg','Submitting…','var(--accent)');const {data,error}=await sb.rpc('request_withdraw',{p_user_id:state.user.id,p_amount:amount,p_reference:ref,p_sms_text:sms});if(error)return setMsg('walletMsg','Error: '+error.message,'var(--danger)');if(!data.ok){if(data.reason==='too_soon'){startCooldown(data.wait_seconds||180,'withdraw');return setMsg('walletMsg','Please wait '+(data.wait_seconds||180)+'s before another request.','var(--danger)');}if(data.reason==='insufficient')return setMsg('walletMsg','Insufficient balance','var(--danger)');if(data.reason==='missing_sms')return setMsg('walletMsg','Paste the Telebirr SMS first','var(--danger)');return setMsg('walletMsg',data.reason,'var(--danger)');}setMsg('walletMsg','✅ Withdrawal request sent.','var(--mark)');$('withdrawAmount').value='';$('withdrawSms').value='';startCooldown(180,'withdraw');await Promise.all([loadUser(),loadWallet()]);updateHeaderUser();};
+
+  $('btnWithdraw').onclick = async () => {
+    const amount = parseFloat($('withdrawAmount').value);
+    const ref = $('withdrawRef').value.trim();
+
+    if (!amount || amount < MIN_WITHDRAW)
+      return setMsg('walletMsg', 'Minimum withdraw is ' + MIN_WITHDRAW + ' birr', 'var(--danger)');
+    if (!ref)
+      return setMsg('walletMsg', 'Enter your Telebirr number', 'var(--danger)');
+
+    setMsg('walletMsg', 'Submitting…', 'var(--accent)');
+
+    const {data, error} = await sb.rpc('request_withdraw', {
+      p_user_id: state.user.id,
+      p_amount: amount,
+      p_reference: ref,
+      p_sms_text: null
+    });
+
+    if (error) return setMsg('walletMsg', 'Error: ' + error.message, 'var(--danger)');
+    if (!data.ok) {
+      if (data.reason === 'too_soon') {
+        startCooldown(data.wait_seconds || 180, 'withdraw');
+        return setMsg('walletMsg', 'Please wait ' + (data.wait_seconds||180) + 's before another request.', 'var(--danger)');
+      }
+      if (data.reason === 'insufficient')
+        return setMsg('walletMsg', 'Insufficient balance', 'var(--danger)');
+      return setMsg('walletMsg', data.reason, 'var(--danger)');
+    }
+
+    setMsg('walletMsg', '✅ Withdrawal request sent. Admin will send money to your Telebirr.', 'var(--mark)');
+    $('withdrawAmount').value = '';
+    startCooldown(180, 'withdraw');
+    await Promise.all([loadUser(), loadWallet()]);
+    updateHeaderUser();
+  };
   function startCooldown(seconds,which){const el=which==='withdraw'?$('withdrawCooldown'):null,btn=which==='withdraw'?$('btnWithdraw'):$('btnDeposit');if(!el||!btn)return;let remain=seconds;btn.disabled=true;el.style.display='block';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);el.style.display='none';btn.disabled=false;return;}el.textContent='⏱ Next request in '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0');},1000);el.textContent='⏱ Next request in '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0');};
   if($('walletHistoryToggle'))$('walletHistoryToggle').onclick=()=>{const w=$('walletHistoryWrap'),c=$('walletHistoryChevron'),open=w.style.display!=='none';w.style.display=open?'none':'block';c.style.transform=open?'rotate(0deg)':'rotate(180deg)';};
   let walletHistoryFilter=null;document.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-hist]').forEach(x=>x.classList.remove('gold'));b.classList.add('gold');walletHistoryFilter=b.dataset.hist;renderWalletHistory();});
