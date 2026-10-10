@@ -2572,6 +2572,46 @@ const AudioCaller=(function(){
 })();
 window.AudioCaller=AudioCaller;
 
+/* ═══════════════════════════════════════════════════════════
+   WINNER VOICE — single Amharic MP3 announcement (~4s)
+   ═══════════════════════════════════════════════════════════ */
+const WinnerVoice=(function(){
+  const FILE='./audio/winner.mp3';
+  let currentAudio=null;
+  let playing=false;
+
+  function play(){
+    if(playing) return Promise.resolve(false);
+    playing=true;
+    return new Promise(resolve=>{
+      try{
+        const a=new Audio(FILE);
+        a.volume=1;
+        currentAudio=a;
+        a.onended=()=>{ currentAudio=null; playing=false; resolve(true); };
+        a.onerror=()=>{ currentAudio=null; playing=false;
+          console.warn('[WinnerVoice] load failed:',FILE); resolve(false); };
+        const p=a.play();
+        if(p&&p.catch)p.catch(err=>{
+          currentAudio=null; playing=false;
+          console.warn('[WinnerVoice] play blocked:',err.name);
+          resolve(false);
+        });
+      }catch(e){ playing=false; console.warn('[WinnerVoice]',e); resolve(false); }
+    });
+  }
+
+  function stop(){
+    try{
+      if(currentAudio){ currentAudio.pause(); currentAudio.currentTime=0; currentAudio=null; }
+    }catch(e){}
+    playing=false;
+  }
+
+  return { play, stop };
+})();
+window.WinnerVoice=WinnerVoice;
+
 
   function speakText(text,lang){
     if(!('speechSynthesis' in window))return;
@@ -2943,6 +2983,28 @@ window.AudioCaller=AudioCaller;
     }
     autoDaubAll();
 
+    // 🔥 NEW: If this was a live call and I'm the current player,
+    // auto-detect any of MY cards that match the pattern right now.
+    // This fires the same RPC as pressing BINGO, so the server
+    // marks my card `won = true` and settle_round will end the round.
+    if(!silent && state.user && state.round
+       && state.round.status === 'playing'
+       && state.myPaidCards.length > 0){
+      sb.rpc('auto_claim_my_cards', {
+        p_user_id:  state.user.id,
+        p_round_id: state.round.id
+      }).then(r => {
+        const n = r && r.data && r.data.new_winners;
+        if(n > 0){
+          console.log('[auto-win] matched', n, 'of my cards');
+          // Refresh so the win overlay can fire once the round finishes
+          loadRound().catch(()=>{});
+        }
+      }).catch(err => {
+        console.warn('[auto-win] failed:', err && err.message);
+      });
+    }
+
     const roundIsPlaying=!!(state.round&&state.round.status==='playing');
     const liveChannelCall=!!(sourceRoundId&&state.round&&state.round.id===sourceRoundId);
     if(!silent&&(roundIsPlaying||liveChannelCall)&&!state.presentedCalls.has(n)){
@@ -3042,7 +3104,12 @@ window.AudioCaller=AudioCaller;
     // Allow overlay even if name is missing — a finished round always deserves it
     r.winner_name = r.winner_name || 'Winner';
   }
-  state.currentlyShowingRoundId=r.id;const [{data:winners},{data:allCalls}]=await Promise.all([sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),sb.from('calls').select('number').eq('round_id',r.id)]);const winnerList=winners||[],calledSet=new Set((allCalls||[]).map(c=>c.number)),count=winnerList.length||1,perWinner=Number(r.winner_prize||0),totalPrize=Number(r.prize_amount||perWinner*count);$('winRoundLine').textContent='ROUND #'+(r.round_number||'—');$('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');$('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name):'🏆 '+count+' Winners';$('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';$('winPrizeBig').textContent=birr(totalPrize)+' birr total';const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';winnerList.forEach(card=>{const c=document.createElement('div');c.className='card';const header=document.createElement('div');header.className='card-header';['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});c.appendChild(header);const g=document.createElement('div');g.className='grid';const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);}c.appendChild(g);const label=document.createElement('div');label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);});$('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();speakBingoMessage('bingo');setTimeout(()=>speakBingoMessage('winner'),1200);const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
+  state.currentlyShowingRoundId=r.id;const [{data:winners},{data:allCalls}]=await Promise.all([sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),sb.from('calls').select('number').eq('round_id',r.id)]);const winnerList=winners||[],calledSet=new Set((allCalls||[]).map(c=>c.number)),count=winnerList.length||1,perWinner=Number(r.winner_prize||0),totalPrize=Number(r.prize_amount||perWinner*count);$('winRoundLine').textContent='ROUND #'+(r.round_number||'—');$('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');$('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name):'🏆 '+count+' Winners';$('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';$('winPrizeBig').textContent=birr(totalPrize)+' birr total';const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';winnerList.forEach(card=>{const c=document.createElement('div');c.className='card';const header=document.createElement('div');header.className='card-header';['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});c.appendChild(header);const g=document.createElement('div');g.className='grid';const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);}c.appendChild(g);const label=document.createElement('div');label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);});$('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();
+
+// 🔥 Amharic winner announcement
+if(state.voiceOn && window.WinnerVoice){
+  WinnerVoice.play().catch(()=>{});
+}const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
 
 
   /* LOGIN */
@@ -3089,11 +3156,13 @@ window.AudioCaller=AudioCaller;
     $('voiceOn').checked=false;$('btnToggleVoice').textContent='🔊 Voice: OFF';}
   $('voiceOn').onchange=()=>{state.voiceOn=$('voiceOn').checked;
     localStorage.setItem('bingo_voice',state.voiceOn?'1':'0');
-    $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');};
+    $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');
+    if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();};
   $('btnToggleVoice').onclick=()=>{state.voiceOn=!state.voiceOn;
     $('voiceOn').checked=state.voiceOn;
     localStorage.setItem('bingo_voice',state.voiceOn?'1':'0');
-    $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');};
+    $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');
+    if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();};
 
   $('btnLogin').onclick=async()=>{
     // Unlock browser media while this is still a user gesture.
