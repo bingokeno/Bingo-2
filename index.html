@@ -3105,11 +3105,10 @@ window.WinnerVoice=WinnerVoice;
     r.winner_name = r.winner_name || 'Winner';
   }
   state.currentlyShowingRoundId=r.id;const [{data:winners},{data:allCalls}]=await Promise.all([sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),sb.from('calls').select('number').eq('round_id',r.id)]);const winnerList=winners||[],calledSet=new Set((allCalls||[]).map(c=>c.number)),count=winnerList.length||1,perWinner=Number(r.winner_prize||0),totalPrize=Number(r.prize_amount||perWinner*count);$('winRoundLine').textContent='ROUND #'+(r.round_number||'—');$('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');$('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name):'🏆 '+count+' Winners';$('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';$('winPrizeBig').textContent=birr(totalPrize)+' birr total';const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';winnerList.forEach(card=>{const c=document.createElement('div');c.className='card';const header=document.createElement('div');header.className='card-header';['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});c.appendChild(header);const g=document.createElement('div');g.className='grid';const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);}c.appendChild(g);const label=document.createElement('div');label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);});$('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();
-
-// 🔥 Amharic winner announcement
-if(state.voiceOn && window.WinnerVoice){
-  WinnerVoice.play().catch(()=>{});
-}const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
+  // 🔥 Amharic winner announcement
+  if(state.voiceOn && window.WinnerVoice){
+    WinnerVoice.play().catch(()=>{});
+  }const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
 
 
   /* LOGIN */
@@ -3157,12 +3156,14 @@ if(state.voiceOn && window.WinnerVoice){
   $('voiceOn').onchange=()=>{state.voiceOn=$('voiceOn').checked;
     localStorage.setItem('bingo_voice',state.voiceOn?'1':'0');
     $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');
-    if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();};
+    if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();
+  };
   $('btnToggleVoice').onclick=()=>{state.voiceOn=!state.voiceOn;
     $('voiceOn').checked=state.voiceOn;
     localStorage.setItem('bingo_voice',state.voiceOn?'1':'0');
     $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');
-    if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();};
+    if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();
+  };
 
   $('btnLogin').onclick=async()=>{
     // Unlock browser media while this is still a user gesture.
