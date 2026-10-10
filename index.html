@@ -949,6 +949,15 @@
   }
   .wallet-history-item.deposit{border-left-color:#10b981}
   .wallet-history-item.withdraw{border-left-color:#ef4444}
+  .wallet-history-item.win{
+    border-left-color:var(--gold);
+    background:linear-gradient(155deg,rgba(251,191,36,.12),rgba(7,12,26,.9));
+    box-shadow:0 0 12px rgba(251,191,36,.2);
+  }
+  .wallet-history-item.win .whi-type{
+    color:var(--gold);
+    text-shadow:0 0 8px rgba(251,191,36,.5);
+  }
   .wallet-history-item .whi-left{flex:1;min-width:0}
   .wallet-history-item .whi-type{
     font-family:'Poppins',sans-serif;font-weight:900;font-size:.72rem;
@@ -1896,11 +1905,9 @@
           <span class="wi-icon">💰</span>
           <input id="depositAmount" placeholder="Amount (min 100 birr)" inputmode="numeric" />
         </div>
-        <div class="wallet-input-row" style="align-items:flex-start">
-          <span class="wi-icon" style="top:12px">📩</span>
-          <textarea id="depositSms"
-            placeholder="Paste the Telebirr confirmation SMS you received after sending"
-            rows="3" style="padding:14px 14px 14px 42px;font-family:monospace;font-size:.78rem;resize:vertical"></textarea>
+        <div class="wallet-input-row">
+          <span class="wi-icon">🔖</span>
+          <input id="depositRef" placeholder="Telebirr reference (from SMS)" />
         </div>
 
         <button id="btnDeposit" class="ws-submit">💳 REQUEST DEPOSIT</button>
@@ -1924,6 +1931,7 @@
       <div class="wallet-section withdraw"><div class="ws-header"><div class="ws-badge">⬆️</div><div><div class="ws-title">Withdraw</div><div class="ws-desc">Send winnings to your Telebirr number</div></div></div>
         <div class="wallet-input-row"><span class="wi-icon">💰</span><input id="withdrawAmount" placeholder="Amount (min 50 birr)" inputmode="numeric" /></div>
         <div class="wallet-input-row"><span class="wi-icon">📱</span><input id="withdrawRef" placeholder="Your Telebirr number" inputmode="tel" /></div>
+        <div class="wallet-input-row" style="align-items:flex-start"><span class="wi-icon" style="top:12px">📩</span><textarea id="withdrawSms" placeholder="Paste the Telebirr confirmation SMS you received" rows="3" style="padding:14px 14px 14px 42px;font-family:monospace;font-size:.78rem;resize:vertical"></textarea></div>
         <button id="btnWithdraw" class="ws-submit">💸 REQUEST WITHDRAWAL</button><div id="withdrawCooldown" style="display:none;text-align:center;padding:8px;border-radius:10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;font-size:.72rem;font-weight:800;margin-top:8px"></div>
       </div>
 
@@ -3027,7 +3035,14 @@ window.AudioCaller=AudioCaller;
     }
     return PATTERN_CELLS[pattern]||[];
   }
-  async function showWinner(r){if(!r||!r.winner_name||r.winner_name==='No winner'||state.currentlyShowingRoundId===r.id)return;state.currentlyShowingRoundId=r.id;const [{data:winners},{data:allCalls}]=await Promise.all([sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),sb.from('calls').select('number').eq('round_id',r.id)]);const winnerList=winners||[],calledSet=new Set((allCalls||[]).map(c=>c.number)),count=winnerList.length||1,perWinner=Number(r.winner_prize||0),totalPrize=Number(r.prize_amount||perWinner*count);$('winRoundLine').textContent='ROUND #'+(r.round_number||'—');$('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');$('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name):'🏆 '+count+' Winners';$('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';$('winPrizeBig').textContent=birr(totalPrize)+' birr total';const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';winnerList.forEach(card=>{const c=document.createElement('div');c.className='card';const header=document.createElement('div');header.className='card-header';['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});c.appendChild(header);const g=document.createElement('div');g.className='grid';const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);}c.appendChild(g);const label=document.createElement('div');label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';label.textContent=(card.is_bot?'🤖 ':'👤 ')+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);});$('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();speakBingoMessage('bingo');setTimeout(()=>speakBingoMessage('winner'),1200);const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
+  async function showWinner(r){
+  if(!r || state.currentlyShowingRoundId===r.id) return;
+  if(r.status && r.status !== 'finished') return;
+  if(!r.winner_name || r.winner_name === 'No winner'){
+    // Allow overlay even if name is missing — a finished round always deserves it
+    r.winner_name = r.winner_name || 'Winner';
+  }
+  state.currentlyShowingRoundId=r.id;const [{data:winners},{data:allCalls}]=await Promise.all([sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),sb.from('calls').select('number').eq('round_id',r.id)]);const winnerList=winners||[],calledSet=new Set((allCalls||[]).map(c=>c.number)),count=winnerList.length||1,perWinner=Number(r.winner_prize||0),totalPrize=Number(r.prize_amount||perWinner*count);$('winRoundLine').textContent='ROUND #'+(r.round_number||'—');$('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');$('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name):'🏆 '+count+' Winners';$('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';$('winPrizeBig').textContent=birr(totalPrize)+' birr total';const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';winnerList.forEach(card=>{const c=document.createElement('div');c.className='card';const header=document.createElement('div');header.className='card-header';['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});c.appendChild(header);const g=document.createElement('div');g.className='grid';const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);}c.appendChild(g);const label=document.createElement('div');label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);});$('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();speakBingoMessage('bingo');setTimeout(()=>speakBingoMessage('winner'),1200);const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
 
 
   /* LOGIN */
@@ -3281,6 +3296,7 @@ window.AudioCaller=AudioCaller;
     state.renderedLatestNumber=null;
     state.lastCallReceivedAt=0;
     state.botsSeededFor=null;
+    state.currentlyShowingRoundId=null;   // allow the NEXT round's overlay
     console.log('[round] client state reset for',nextRoundId);
   }
 
@@ -4227,74 +4243,21 @@ window.AudioCaller=AudioCaller;
   function updateSelBar(){
     $('selCount').textContent='1';
   }
-  $('btnDeposit').onclick = async () => {
-    const amount = parseFloat($('depositAmount').value);
-    const sms = $('depositSms').value.trim();
-
-    if (!amount || amount < MIN_DEPOSIT)
-      return setMsg('walletMsg', 'Minimum deposit is ' + MIN_DEPOSIT + ' birr', 'var(--danger)');
-    if (!sms || sms.length < 10)
-      return setMsg('walletMsg', 'Paste the Telebirr SMS you received after sending', 'var(--danger)');
-
-    setMsg('walletMsg', 'Submitting…', 'var(--accent)');
-
-    const {data, error} = await sb.rpc('request_deposit', {
-      p_user_id: state.user.id,
-      p_amount: amount,
-      p_reference: null,
-      p_sms_text: sms
-    });
-
-    if (error) return setMsg('walletMsg', 'Error: ' + error.message, 'var(--danger)');
-    if (!data.ok) {
-      if (data.reason === 'too_soon')
-        return setMsg('walletMsg', 'Please wait ' + (data.wait_seconds||180) + 's before another deposit.', 'var(--danger)');
-      if (data.reason === 'missing_sms')
-        return setMsg('walletMsg', 'Paste the Telebirr SMS first', 'var(--danger)');
-      return setMsg('walletMsg', data.reason, 'var(--danger)');
-    }
-
-    setMsg('walletMsg', '✅ Request sent. Admin will verify and approve.', 'var(--mark)');
-    $('depositAmount').value = '';
-    $('depositSms').value = '';
-    await Promise.all([loadUser(), loadWallet()]);
+  $('btnDeposit').onclick=async()=>{
+    const amount=parseFloat($('depositAmount').value);
+    const ref=$('depositRef').value.trim();
+    if(!amount||amount<MIN_DEPOSIT)return setMsg('walletMsg',
+      'Minimum deposit is '+MIN_DEPOSIT+' birr','var(--danger)');
+    setMsg('walletMsg','Submitting…','var(--accent)');
+    const {data,error}=await sb.rpc('request_deposit',
+      {p_user_id:state.user.id,p_amount:amount,p_reference:ref||null});
+    if(error)return setMsg('walletMsg','Error: '+error.message,'var(--danger)');
+    if(!data.ok){if(data.reason==='too_soon')return setMsg('walletMsg','Please wait '+(data.wait_seconds||180)+'s before another deposit.','var(--danger)');return setMsg('walletMsg',data.reason,'var(--danger)');}
+    setMsg('walletMsg','✅ Request sent. Pay '+amount+' birr to Telebirr '+TELEBIRR,'var(--mark)');
+    $('depositAmount').value='';$('depositRef').value='';
+    await loadWallet();
   };
-
-  $('btnWithdraw').onclick = async () => {
-    const amount = parseFloat($('withdrawAmount').value);
-    const ref = $('withdrawRef').value.trim();
-
-    if (!amount || amount < MIN_WITHDRAW)
-      return setMsg('walletMsg', 'Minimum withdraw is ' + MIN_WITHDRAW + ' birr', 'var(--danger)');
-    if (!ref)
-      return setMsg('walletMsg', 'Enter your Telebirr number', 'var(--danger)');
-
-    setMsg('walletMsg', 'Submitting…', 'var(--accent)');
-
-    const {data, error} = await sb.rpc('request_withdraw', {
-      p_user_id: state.user.id,
-      p_amount: amount,
-      p_reference: ref,
-      p_sms_text: null
-    });
-
-    if (error) return setMsg('walletMsg', 'Error: ' + error.message, 'var(--danger)');
-    if (!data.ok) {
-      if (data.reason === 'too_soon') {
-        startCooldown(data.wait_seconds || 180, 'withdraw');
-        return setMsg('walletMsg', 'Please wait ' + (data.wait_seconds||180) + 's before another request.', 'var(--danger)');
-      }
-      if (data.reason === 'insufficient')
-        return setMsg('walletMsg', 'Insufficient balance', 'var(--danger)');
-      return setMsg('walletMsg', data.reason, 'var(--danger)');
-    }
-
-    setMsg('walletMsg', '✅ Withdrawal request sent. Admin will send money to your Telebirr.', 'var(--mark)');
-    $('withdrawAmount').value = '';
-    startCooldown(180, 'withdraw');
-    await Promise.all([loadUser(), loadWallet()]);
-    updateHeaderUser();
-  };
+  $('btnWithdraw').onclick=async()=>{const amount=parseFloat($('withdrawAmount').value),ref=$('withdrawRef').value.trim(),sms=$('withdrawSms').value.trim();if(!amount||amount<MIN_WITHDRAW)return setMsg('walletMsg','Minimum withdraw is '+MIN_WITHDRAW+' birr','var(--danger)');if(!ref)return setMsg('walletMsg','Enter your Telebirr number','var(--danger)');if(!sms||sms.length<10)return setMsg('walletMsg','Paste the Telebirr SMS you received','var(--danger)');setMsg('walletMsg','Submitting…','var(--accent)');const {data,error}=await sb.rpc('request_withdraw',{p_user_id:state.user.id,p_amount:amount,p_reference:ref,p_sms_text:sms});if(error)return setMsg('walletMsg','Error: '+error.message,'var(--danger)');if(!data.ok){if(data.reason==='too_soon'){startCooldown(data.wait_seconds||180,'withdraw');return setMsg('walletMsg','Please wait '+(data.wait_seconds||180)+'s before another request.','var(--danger)');}if(data.reason==='insufficient')return setMsg('walletMsg','Insufficient balance','var(--danger)');if(data.reason==='missing_sms')return setMsg('walletMsg','Paste the Telebirr SMS first','var(--danger)');return setMsg('walletMsg',data.reason,'var(--danger)');}setMsg('walletMsg','✅ Withdrawal request sent.','var(--mark)');$('withdrawAmount').value='';$('withdrawSms').value='';startCooldown(180,'withdraw');await Promise.all([loadUser(),loadWallet()]);updateHeaderUser();};
   function startCooldown(seconds,which){const el=which==='withdraw'?$('withdrawCooldown'):null,btn=which==='withdraw'?$('btnWithdraw'):$('btnDeposit');if(!el||!btn)return;let remain=seconds;btn.disabled=true;el.style.display='block';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);el.style.display='none';btn.disabled=false;return;}el.textContent='⏱ Next request in '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0');},1000);el.textContent='⏱ Next request in '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0');};
   if($('walletHistoryToggle'))$('walletHistoryToggle').onclick=()=>{const w=$('walletHistoryWrap'),c=$('walletHistoryChevron'),open=w.style.display!=='none';w.style.display=open?'none':'block';c.style.transform=open?'rotate(0deg)':'rotate(180deg)';};
   let walletHistoryFilter=null;document.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-hist]').forEach(x=>x.classList.remove('gold'));b.classList.add('gold');walletHistoryFilter=b.dataset.hist;renderWalletHistory();});
@@ -4308,23 +4271,46 @@ window.AudioCaller=AudioCaller;
     let historyRows=state.walletTx||[];if(walletHistoryFilter)historyRows=historyRows.filter(t=>t.type===walletHistoryFilter);
     if(!historyRows.length){el.innerHTML='<div class="wallet-empty"><span class="we-icon">📭</span>No transactions.</div>';return;}
     historyRows.forEach(t=>{
-      const isCredit=t.type==='deposit';
-      const row=document.createElement('div');
-      row.className='wallet-history-item '+(isCredit?'deposit':'withdraw');
-      const statusClass=t.status==='approved'?'approved':
-        t.status==='rejected'?'rejected':'pending';
-      const statusIcon=t.status==='approved'?'✓':
-        t.status==='rejected'?'✕':'⏳';
-      row.innerHTML=
-        '<div class="whi-left">'+
-          '<div class="whi-type">'+
-            (isCredit?'⬇️ DEPOSIT':'⬆️ WITHDRAW')+
-            ' <span class="whi-status '+statusClass+'">'+statusIcon+' '+t.status+'</span>'+
-          '</div>'+
-          '<div class="whi-date">'+(t.note||new Date(t.created_at).toLocaleString())+'</div>'+
-        '</div>'+
-        '<div class="whi-amount '+(isCredit?'positive':'negative')+'">'+
-          (isCredit?'+':'-')+birr(t.amount)+'</div>';
+      const isDeposit  = t.type === 'deposit';
+      const isWithdraw = t.type === 'withdraw';
+      const isWin      = t.type === 'win';
+
+      const row = document.createElement('div');
+      row.className =
+        'wallet-history-item ' +
+        (isDeposit ? 'deposit' : isWin ? 'win' : 'withdraw');
+
+      const statusClass = t.status === 'approved' ? 'approved'
+        : t.status === 'rejected' ? 'rejected'
+        : 'pending';
+      const statusIcon = t.status === 'approved' ? '✓'
+        : t.status === 'rejected' ? '✕'
+        : '⏳';
+
+      const label = isDeposit ? '⬇️ DEPOSIT'
+        : isWithdraw ? '⬆️ WITHDRAW'
+        : isWin ? '🏆 WIN'
+        : (t.type || '').toUpperCase();
+
+      const sign = isWithdraw ? '-' : '+';
+      const amountClass = isWithdraw ? 'negative' : 'positive';
+
+      row.innerHTML =
+        '<div class="whi-left">' +
+          '<div class="whi-type">' +
+            label +
+            ' <span class="whi-status ' + statusClass + '">' +
+              statusIcon + ' ' + t.status +
+            '</span>' +
+          '</div>' +
+          '<div class="whi-date">' +
+            (t.note || new Date(t.created_at).toLocaleString()) +
+          '</div>' +
+        '</div>' +
+        '<div class="whi-amount ' + amountClass + '">' +
+          sign + birr(t.amount) +
+        '</div>';
+
       el.appendChild(row);
     });
   }
@@ -4420,7 +4406,7 @@ window.AudioCaller=AudioCaller;
     setMsg('gameMsg','Not a bingo yet.','var(--danger)');
     setTimeout(()=>setMsg('gameMsg',''),1500);
   };
-  async function renderWinners(){const el=$('winnerBoard');if(!el)return;const {data:rounds}=await sb.from('rounds').select('*').eq('status','finished').order('ended_at',{ascending:false}).limit(30);if(!rounds||!rounds.length){el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.84rem">No winners yet.</div>';return;}const ids=rounds.map(r=>r.id),{data:cards}=await sb.from('card_pool').select('*').in('round_id',ids).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true});const cardMap={};(cards||[]).forEach(c=>(cardMap[c.round_id]=cardMap[c.round_id]||[]).push(c));el.innerHTML='';rounds.forEach(r=>{const winners=cardMap[r.id]||[],count=winners.length;if(count===0&&r.winner_name==='No winner')return;const perWinner=Number(r.winner_prize||0),row=document.createElement('div');row.style.cssText='background:rgba(7,12,26,.7);padding:11px 13px;border-radius:11px;margin-bottom:6px;font-size:.76rem;border:1px solid rgba(148,163,184,.1);border-left:3px solid var(--mark)';const header='<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-weight:800">Round #'+(r.round_number||'—')+' · '+(PATTERN_LABEL[r.pattern]||'Line')+'</div><div style="color:var(--muted);font-size:.66rem">'+count+(count===1?' winner':' winners')+' · '+new Date(r.ended_at||r.created_at).toLocaleString()+'</div></div><div style="color:var(--mark);font-weight:900;font-family:Poppins,sans-serif">'+birr(perWinner*count)+' birr</div></div>';const list=winners.map(c=>'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12)"><span style="font-weight:700">'+(c.is_bot?'🤖 ':'👤 ')+esc(c.user_name||'?')+'</span> · Card #'+c.slot_number+'<span style="color:var(--mark);float:right">'+birr(perWinner)+' birr</span></div>').join('');row.innerHTML=header+list;el.appendChild(row);});if(!el.innerHTML)el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.84rem">No winners yet.</div>';}
+  async function renderWinners(){const el=$('winnerBoard');if(!el)return;const {data:rounds}=await sb.from('rounds').select('*').eq('status','finished').order('ended_at',{ascending:false}).limit(30);if(!rounds||!rounds.length){el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.84rem">No winners yet.</div>';return;}const ids=rounds.map(r=>r.id),{data:cards}=await sb.from('card_pool').select('*').in('round_id',ids).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true});const cardMap={};(cards||[]).forEach(c=>(cardMap[c.round_id]=cardMap[c.round_id]||[]).push(c));el.innerHTML='';rounds.forEach(r=>{const winners=cardMap[r.id]||[],count=winners.length;if(count===0&&r.winner_name==='No winner')return;const perWinner=Number(r.winner_prize||0),row=document.createElement('div');row.style.cssText='background:rgba(7,12,26,.7);padding:11px 13px;border-radius:11px;margin-bottom:6px;font-size:.76rem;border:1px solid rgba(148,163,184,.1);border-left:3px solid var(--mark)';const header='<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-weight:800">Round #'+(r.round_number||'—')+' · '+(PATTERN_LABEL[r.pattern]||'Line')+'</div><div style="color:var(--muted);font-size:.66rem">'+count+(count===1?' winner':' winners')+' · '+new Date(r.ended_at||r.created_at).toLocaleString()+'</div></div><div style="color:var(--mark);font-weight:900;font-family:Poppins,sans-serif">'+birr(perWinner*count)+' birr</div></div>';const list=winners.map(c=>'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12)"><span style="font-weight:700">🏆 '+esc(c.user_name||'?')+'</span> · Card #'+c.slot_number+'<span style="color:var(--mark);float:right">'+birr(perWinner)+' birr</span></div>').join('');row.innerHTML=header+list;el.appendChild(row);});if(!el.innerHTML)el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.84rem">No winners yet.</div>';}
 
   function buildPatternPicker(){
     const el=$('patternPicker');if(!el||el.dataset.built==='1')return;
@@ -5090,17 +5076,36 @@ window.AudioCaller=AudioCaller;
       .subscribe());
   }
   function startReconcileLoop(){
-    if(state.reconcileTimer)return;
-    state.reconcileTimer=setInterval(()=>{
-      if(document.hidden)return;
-      syncState('periodic').catch(()=>{});
-      if(state.user&&!state.user.is_admin)loadUser().catch(()=>{});
-      if(state.user&&state.user.is_admin){
-        loadWalletRequests().catch(()=>{});
-        loadPasswordResetRequests().catch(()=>{});
-        loadHelpInbox().catch(()=>{});
+  if(state.reconcileTimer)return;
+  state.reconcileTimer=setInterval(async ()=>{
+    if(document.hidden)return;
+    syncState('periodic').catch(()=>{});
+    if(state.user&&!state.user.is_admin)loadUser().catch(()=>{});
+
+    // FALLBACK: check the most recent finished round every 5s.
+    // This recovers the win overlay if a Realtime UPDATE was missed.
+    try{
+      const {data:lastFinished} = await sb.from('rounds')
+        .select('*')
+        .eq('status','finished')
+        .order('ended_at',{ascending:false})
+        .limit(1)
+        .maybeSingle();
+      if(lastFinished && lastFinished.winner_name
+         && lastFinished.winner_name !== 'No winner'
+         && state.currentlyShowingRoundId !== lastFinished.id){
+        const endedMs = new Date(lastFinished.ended_at || 0).getTime();
+        const isRecent = Date.now() - endedMs < 60000;
+        if(isRecent) showWinner(lastFinished);
       }
-    },5000);
+    }catch(e){}
+
+    if(state.user&&state.user.is_admin){
+      loadWalletRequests().catch(()=>{});
+      loadPasswordResetRequests().catch(()=>{});
+      loadHelpInbox().catch(()=>{});
+    }
+  },5000);
   }
   function startCallPolling(){
     if(state.callPollTimer)return;
