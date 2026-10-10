@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <meta name="theme-color" content="#0a0f1e" />
-<title>Bingo — Ethiopia</title>
+<title>KEBE BINGO · ከቤ ቢንጎ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800;900&family=Noto+Sans+Ethiopic:wght@400;600;800&display=swap" rel="stylesheet">
@@ -1658,8 +1658,11 @@
 @keyframes restoreSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 </style>
 <div class="wrap" style="margin-top:30px">
-  <h1>🇪🇹 BINGO</h1>
-  <div class="subtitle" id="subtitle">Ethiopia's Premium Bingo Platform</div>
+  <h1>🇪🇹 KEBE BINGO</h1>
+  <div class="subtitle" id="subtitle">KEBE BINGO · ከቤ ቢንጎ</div>
+  <!-- Notification bell and panel -->
+  <div id="notifBell" style="position:fixed;top:max(14px,env(safe-area-inset-top));right:14px;z-index:1200;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#06b6d4,#0891b2);display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 24px rgba(6,182,212,.5);color:#fff;font-size:1.2rem">🔔<span id="notifCount" style="position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font-size:.62rem;font-weight:900;display:none;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(239,68,68,.6)">0</span></div>
+  <div id="notifPanel" style="position:fixed;top:max(14px,env(safe-area-inset-top));right:14px;width:min(94vw,380px);max-height:72vh;background:linear-gradient(155deg,#1a2440,#0f1a30);border:1.5px solid rgba(6,182,212,.4);border-radius:18px;padding:14px;z-index:1201;display:none;box-shadow:0 20px 50px rgba(0,0,0,.7),0 0 40px rgba(6,182,212,.25);flex-direction:column;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(148,163,184,.15)"><div style="font-family:'Poppins',sans-serif;font-weight:900;color:#06b6d4;letter-spacing:.6px;font-size:.9rem">🔔 Notifications</div><button id="notifClose" class="ghost mini" style="width:auto;padding:6px 12px;margin:0">✕</button></div><div id="notifList" style="flex:1;overflow-y:auto;min-height:120px"></div><button id="notifClearAll" class="ghost mini" style="margin-top:10px;width:100%">Clear all</button></div>
 
   <div id="fatalError"></div>
 
@@ -1678,8 +1681,8 @@
           <span class="lg-dot"></span>
         </div>
         <div>
-          <h1 class="lg-title">BINGO<span>.ET</span></h1>
-          <p class="lg-sub">Bingo Ethiopia</p>
+          <h1 class="lg-title">KEBE <span>BINGO</span></h1>
+          <p class="lg-sub">ከቤ ቢንጎ</p>
         </div>
       </div>
 
@@ -1754,33 +1757,26 @@
         </form>
 
         <div id="forgotPanel" class="lg-forgot-panel">
-          <h3>Password Recovery</h3>
-          <p>Enter your registered phone number. The admin will be notified and will help you reset your password.</p>
-          <div class="lg-field">
-            <label class="lg-label">Phone number</label>
-            <div class="lg-input-wrap">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
-              </svg>
-              <input id="forgotPhone" type="tel" placeholder="0912345678" inputmode="tel" />
-            </div>
+          <div id="forgotStep1">
+            <h3>Password Recovery</h3><p>Enter your registered phone. The admin will send you a 6-digit code valid for 10 minutes.</p>
+            <div class="lg-field"><label class="lg-label">Phone number</label><div class="lg-input-wrap"><input id="forgotPhone" type="tel" placeholder="0912345678" inputmode="tel" /></div></div>
+            <button id="btnSendForgot" class="lg-submit" type="button" style="margin-bottom:.5rem"><span>REQUEST CODE</span></button>
+            <button id="btnCancelForgot" class="lg-forgot" type="button" style="display:block;margin:0 auto;font-size:.75rem">← BACK TO LOGIN</button>
           </div>
-          <button id="btnSendForgot" class="lg-submit" type="button" style="margin-bottom:.5rem">
-            <span>SEND RECOVERY REQUEST</span>
-          </button>
-          <button id="btnCancelForgot" class="lg-forgot" type="button"
-                  style="display:block;margin:0 auto;font-size:.75rem">
-            ← BACK TO LOGIN
-          </button>
-          <div class="lg-msg" id="forgotMsg"></div>
+          <div id="forgotStep2" style="display:none"><h3>Enter Your Code</h3><p>Ask the admin for your 6-digit code. It expires 10 minutes after it was sent.</p>
+            <div id="otpCountdown" style="text-align:center;font-family:Poppins;font-weight:900;font-size:1.4rem;color:#fbbf24;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:12px;padding:10px;margin-bottom:12px;letter-spacing:2px">10:00</div>
+            <div class="lg-field"><label class="lg-label">6-digit code</label><div class="lg-input-wrap"><input id="otpCode" type="tel" placeholder="123456" maxlength="6" inputmode="numeric" style="letter-spacing:6px;text-align:center;font-weight:900" /></div></div>
+            <div class="lg-field"><label class="lg-label">New password</label><div class="lg-input-wrap"><input id="newPassword" type="password" placeholder="At least 4 characters" /></div></div>
+            <button id="btnRedeemOtp" class="lg-submit" type="button" style="margin-bottom:.5rem"><span>RESET PASSWORD</span></button>
+            <button id="btnBackToStep1" class="lg-forgot" type="button" style="display:block;margin:0 auto;font-size:.75rem">← USE A DIFFERENT NUMBER</button>
+          </div><div class="lg-msg" id="forgotMsg"></div>
         </div>
 
         <div class="lg-msg" id="loginMsg"></div>
       </div>
     </main>
 
-    <footer class="lg-footer">© 2026 Bingo Ethiopia</footer>
+    <footer class="lg-footer">© 2026 KEBE BINGO · ከቤ ቢንጎ</footer>
   </div>
 
   <div id="screen-home" class="screen">
@@ -1923,39 +1919,14 @@
         </div>
       </div>
 
-      <div class="wallet-section withdraw">
-        <div class="ws-header">
-          <div class="ws-badge">⬆️</div>
-          <div>
-            <div class="ws-title">Withdraw</div>
-            <div class="ws-desc">Send winnings to your Telebirr number</div>
-          </div>
-        </div>
-
-        <div class="wallet-input-row">
-          <span class="wi-icon">💰</span>
-          <input id="withdrawAmount" placeholder="Amount (min 50 birr)" inputmode="numeric" />
-        </div>
-        <div class="wallet-input-row">
-          <span class="wi-icon">📱</span>
-          <input id="withdrawRef" placeholder="Telebirr number to receive money" inputmode="tel" />
-        </div>
-
-        <button id="btnWithdraw" class="ws-submit">💸 REQUEST WITHDRAWAL</button>
+      <div class="wallet-section withdraw"><div class="ws-header"><div class="ws-badge">⬆️</div><div><div class="ws-title">Withdraw</div><div class="ws-desc">Send winnings to your Telebirr number</div></div></div>
+        <div class="wallet-input-row"><span class="wi-icon">💰</span><input id="withdrawAmount" placeholder="Amount (min 50 birr)" inputmode="numeric" /></div>
+        <div class="wallet-input-row"><span class="wi-icon">📱</span><input id="withdrawRef" placeholder="Your Telebirr number" inputmode="tel" /></div>
+        <div class="wallet-input-row" style="align-items:flex-start"><span class="wi-icon" style="top:12px">📩</span><textarea id="withdrawSms" placeholder="Paste the Telebirr confirmation SMS you received" rows="3" style="padding:14px 14px 14px 42px;font-family:monospace;font-size:.78rem;resize:vertical"></textarea></div>
+        <button id="btnWithdraw" class="ws-submit">💸 REQUEST WITHDRAWAL</button><div id="withdrawCooldown" style="display:none;text-align:center;padding:8px;border-radius:10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;font-size:.72rem;font-weight:800;margin-top:8px"></div>
       </div>
 
-      <div class="wallet-section">
-        <div class="ws-header" style="color:var(--accent)">
-          <div class="ws-badge" style="background:linear-gradient(135deg,#6366f1,#4f46e5);
-            box-shadow:0 8px 20px rgba(99,102,241,.4)">📜</div>
-          <div>
-            <div class="ws-title">Transaction History</div>
-            <div class="ws-desc">Your last 50 transactions</div>
-          </div>
-        </div>
-
-        <div id="walletHistory"></div>
-      </div>
+      <div class="wallet-section" style="color:var(--accent)"><div class="ws-header" style="cursor:pointer" id="walletHistoryToggle"><div class="ws-badge" style="background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 8px 20px rgba(99,102,241,.4)">📜</div><div style="flex:1"><div class="ws-title">Transaction History</div><div class="ws-desc">Tap to expand</div></div><div id="walletHistoryChevron" style="font-size:1.4rem;color:var(--muted);transition:transform .2s">▾</div></div><div id="walletHistoryWrap" style="display:none;margin-top:10px"><div style="display:flex;gap:6px;margin-bottom:10px"><button class="mini ghost" data-hist="deposit" style="flex:1">⬇️ Deposits</button><button class="mini ghost" data-hist="withdraw" style="flex:1">⬆️ Withdrawals</button></div><div id="walletHistory"></div></div></div>
 
       <div class="msg" id="walletMsg"></div>
     </div>
@@ -2381,8 +2352,8 @@ const AMHARIC_MSGS = {
 
 let LANG='en';
 const I18N={
-  en:{subtitle:"Ethiopia's Premium Bingo Platform"},
-  am:{subtitle:"የኢትዮጵያ ፕሪሚየም የቢንጎ መድረክ"}
+  en:{subtitle:"KEBE BINGO · ከቤ ቢንጎ"},
+  am:{subtitle:"ከቤ ቢንጎ"}
 };
 function t(k){return (I18N[LANG]&&I18N[LANG][k])||I18N.en[k]||k;}
 
@@ -2420,7 +2391,7 @@ if('speechSynthesis' in window){
   const state={
     user:null,cashier:null,round:null,
     pool:[],myPaidCards:[],mySelected:new Set(),walletTx:[],
-    previewSlot:null,called:new Set(),latestNumber:null,
+    previewSlot:null,called:new Set(),presentedCalls:new Set(),latestNumber:null,
     winners:[],payouts:[],walletReqs:[],players:[],roundHistory:[],
     stats:null,cashiers:[],sessions:[],currentSession:null,cashierTickets:[],
     supportMessages:[],adminHelpUnread:0,currentHelpUser:null,helpUsers:[],
@@ -3055,76 +3026,8 @@ window.AudioCaller=AudioCaller;
     }
     return PATTERN_CELLS[pattern]||[];
   }
-  async function showWinner(r){
-    if(!r||!r.winner_name)return;
-    if(r.winner_name==='No winner')return;
-    if(state.currentlyShowingRoundId===r.id)return;
-    state.currentlyShowingRoundId=r.id;
-    let cardData=null,shownPlayers=null,winPrize=null;
-    let winnerCalled=new Set();
-    try{
-      const [{data:allCards},{data:roundCalls}]=await Promise.all([
-        sb.from('card_pool').select('*').eq('round_id',r.id),
-        sb.from('calls').select('number').eq('round_id',r.id)
-      ]);
-      const cards=allCards||[];
-      cardData=cards.find(c=>c.slot_number===r.winner_slot)||null;
-      winnerCalled=new Set((roundCalls||[]).map(c=>c.number));
-      const dc=displayCounts(r,cards);
-      shownPlayers=dc.players;
-      winPrize=dc.prize;
-    }catch(e){console.warn('winner cards:',e);}
-    if(shownPlayers==null||winPrize==null){
-      const dc=storedDisplayCounts(r);
-      shownPlayers=dc.players;
-      winPrize=dc.prize;
-    }
-    const wrap=$('winCardWrap');wrap.innerHTML='';
-    if(cardData){
-      const card=document.createElement('div');card.className='card';
-      const header=document.createElement('div');header.className='card-header';
-      ['B','I','N','G','O'].forEach(l=>{const d=document.createElement('div');
-        d.textContent=l;header.appendChild(d);});
-      card.appendChild(header);
-      const g=document.createElement('div');g.className='grid';
-      const nums=cardData.numbers;
-      const lineIdx=findWinningCells(r.pattern,nums,winnerCalled);
-      for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){
-        const idx=rr*5+cc,val=nums[idx];
-        const cell=document.createElement('div');cell.className='cell';
-        if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}
-        else{cell.textContent=val;if(winnerCalled.has(val))cell.classList.add('hit');}
-        if(lineIdx.includes(idx))cell.classList.add('winline');
-        g.appendChild(cell);
-      }
-      card.appendChild(g);wrap.appendChild(card);
-    }
-    $('winRoundLine').textContent='ROUND #'+(r.round_number||'—');
-    $('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Any Line');
-    $('winWinnerName').textContent='🏆 '+r.winner_name;
-    $('winDetails').textContent='Card #'+(r.winner_slot||'—')+
-      ' · '+(shownPlayers!=null?shownPlayers:birr(r.total_kartelas||0))+' players';
-    $('winPrizeBig').textContent=birr(winPrize)+' birr';
-    $('winOverlay').classList.add('show');
-    spawnConfetti();playBingoFanfare();
-    speakBingoMessage('bingo');
-    setTimeout(()=>speakBingoMessage('winner'), 1200);
-    setTimeout(()=>speakText('Bingo! '+r.winner_name+' wins '+
-      birr(winPrize)+' birr','en-US'),1600);
-    try{if(navigator.vibrate)navigator.vibrate([120,60,120,60,220]);}catch(e){}
-    const btn=$('btnWinDismiss');
-    let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);
-    btn.textContent='CLOSE (auto in '+remain+'s)';
-    const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}
-      btn.textContent='CLOSE (auto in '+remain+'s)';},1000);
-    clearTimeout(state.winCloseTimer);
-    state.winCloseTimer=setTimeout(()=>{
-      clearInterval(tick);hideWinner();
-      state.currentlyShowingRoundId=null;
-      speakBingoMessage('roundFinished');
-      setTimeout(()=>speakBingoMessage('nextRound'), 1800);
-    },WIN_AUTO_CLOSE_MS);
-  }
+  async function showWinner(r){if(!r||!r.winner_name||r.winner_name==='No winner'||state.currentlyShowingRoundId===r.id)return;state.currentlyShowingRoundId=r.id;const [{data:winners},{data:allCalls}]=await Promise.all([sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),sb.from('calls').select('number').eq('round_id',r.id)]);const winnerList=winners||[],calledSet=new Set((allCalls||[]).map(c=>c.number)),count=winnerList.length||1,perWinner=Number(r.winner_prize||0),totalPrize=Number(r.prize_amount||perWinner*count);$('winRoundLine').textContent='ROUND #'+(r.round_number||'—');$('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');$('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name):'🏆 '+count+' Winners';$('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';$('winPrizeBig').textContent=birr(totalPrize)+' birr total';const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';winnerList.forEach(card=>{const c=document.createElement('div');c.className='card';const header=document.createElement('div');header.className='card-header';['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});c.appendChild(header);const g=document.createElement('div');g.className='grid';const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);}c.appendChild(g);const label=document.createElement('div');label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';label.textContent=(card.is_bot?'🤖 ':'👤 ')+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);});$('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();speakBingoMessage('bingo');setTimeout(()=>speakBingoMessage('winner'),1200);const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
+
 
   /* LOGIN */
   $('plModeLogin').onclick=()=>{
@@ -3158,17 +3061,11 @@ window.AudioCaller=AudioCaller;
     setMsg('forgotMsg','');
     applyLang();
   };
-  $('btnSendForgot').onclick=async()=>{
-    const phone=$('forgotPhone').value.trim();
-    if(!phone)return setMsg('forgotMsg','Enter your phone number','var(--danger)');
-    $('btnSendForgot').disabled=true;
-    setMsg('forgotMsg','Sending…','var(--accent)');
-    const {data,error}=await sb.rpc('request_password_reset',{p_phone:phone});
-    $('btnSendForgot').disabled=false;
-    if(error)return setMsg('forgotMsg','Error: '+error.message,'var(--danger)');
-    setMsg('forgotMsg','✅ Request sent. The admin will contact you shortly.','var(--mark)');
-    $('forgotPhone').value='';
-  };
+  $('btnSendForgot').onclick=async()=>{const phone=$('forgotPhone').value.trim();if(!phone)return setMsg('forgotMsg','Enter your phone number','var(--danger)');$('btnSendForgot').disabled=true;setMsg('forgotMsg','Sending request…','var(--accent)');const {data,error}=await sb.rpc('request_password_reset',{p_phone:phone});$('btnSendForgot').disabled=false;if(error)return setMsg('forgotMsg','Error: '+error.message,'var(--danger)');setMsg('forgotMsg','✅ Request sent. Ask the admin for your 6-digit code.','var(--mark)');$('forgotStep1').style.display='none';$('forgotStep2').style.display='block';startOtpCountdown(600);};
+  $('btnBackToStep1').onclick=()=>{stopOtpCountdown();$('forgotStep2').style.display='none';$('forgotStep1').style.display='block';$('otpCode').value='';$('newPassword').value='';$('btnRedeemOtp').disabled=false;setMsg('forgotMsg','');};
+  let otpTimer=null;function startOtpCountdown(seconds){const el=$('otpCountdown');if(!el)return;stopOtpCountdown();let remain=seconds;el.textContent='10:00';el.style.color='#fbbf24';otpTimer=setInterval(()=>{remain--;if(remain<=0){clearInterval(otpTimer);otpTimer=null;el.textContent='EXPIRED';el.style.color='#ef4444';setMsg('forgotMsg','Code expired. Ask the admin to send a new one, then request again.','var(--danger)');$('btnRedeemOtp').disabled=true;return;}el.textContent=Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0');if(remain<=60)el.style.color='#ef4444';},1000);}function stopOtpCountdown(){if(otpTimer){clearInterval(otpTimer);otpTimer=null;}}
+  $('btnRedeemOtp').onclick=async()=>{const phone=$('forgotPhone').value.trim(),otp=$('otpCode').value.trim(),pass=$('newPassword').value;if(!phone)return setMsg('forgotMsg','Enter your phone number','var(--danger)');if(!/^\d{6}$/.test(otp))return setMsg('forgotMsg','Enter the 6-digit code','var(--danger)');if(!pass||pass.length<4)return setMsg('forgotMsg','Password must be at least 4 characters','var(--danger)');$('btnRedeemOtp').disabled=true;setMsg('forgotMsg','Checking code…','var(--accent)');const {data,error}=await sb.rpc('reset_password_with_otp',{p_phone:phone,p_otp:otp,p_new_password:pass});$('btnRedeemOtp').disabled=false;if(error)return setMsg('forgotMsg','Error: '+error.message,'var(--danger)');if(!data||!data.ok){const reasons={no_request:'No pending request. Ask the admin to send a code first.',otp_not_sent:'The admin has not sent a code yet.',otp_already_used:'This code was already used. Ask for a new one.',otp_expired:'This code has expired. Ask the admin for a new one.',wrong_otp:'Wrong code.'+(data&&data.attempts_left!=null?' '+data.attempts_left+' attempts left.':''),too_many_attempts:'Too many wrong attempts. Ask the admin for a new code.',weak_password:'Password must be at least 4 characters.',invalid_otp:'Code must be exactly 6 digits.',missing_phone:'Enter your phone number.',user_not_found:'Account not found.'};return setMsg('forgotMsg',reasons[data.reason]||'Reset failed','var(--danger)');}stopOtpCountdown();setMsg('forgotMsg','✅ Password updated! You can log in now.','var(--mark)');setTimeout(()=>{$('btnCancelForgot').click();$('loginPhone').value=phone;$('loginPass').value='';},1500);};
+  if($('otpCode'))$('otpCode').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,6);});
 
   $('loginPhone').value=localStorage.getItem('bingo_phone')||'';
 
@@ -3294,10 +3191,26 @@ window.AudioCaller=AudioCaller;
     }catch(e){console.warn('syncServerTime:',e);}
   }
 
+  /* ═══════ NOTIFICATION SYSTEM ═══════ */
+  const Notifications=(function(){
+    const items=[];let opened=false;function el(id){return document.getElementById(id);}
+    function add(kind,title,body){items.unshift({id:Date.now()+'-'+Math.random().toString(36).slice(2,7),kind,title,body,time:new Date(),seen:false});if(items.length>50)items.length=50;render();updateBadge();try{if(typeof playChime==='function'&&(kind==='deposit'||kind==='withdraw'))playChime();}catch(e){}}
+    function render(){const list=el('notifList');if(!list)return;if(!items.length){list.innerHTML='<div style="text-align:center;color:var(--muted);padding:24px;font-size:.76rem">No notifications yet.</div>';return;}const icons={deposit:'⬇️',withdraw:'⬆️',chat:'💬',finance:'💰',info:'ℹ️'};list.innerHTML=items.map(n=>{const color=n.kind==='deposit'?'#10b981':n.kind==='withdraw'?'#ef4444':n.kind==='chat'?'#8b5cf6':n.kind==='finance'?'#fbbf24':'#06b6d4';return '<div style="background:rgba(7,12,26,.6);padding:10px 12px;border-radius:10px;margin-bottom:6px;border-left:3px solid '+color+';font-size:.74rem"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:3px"><div style="font-weight:800;color:#fff">'+(icons[n.kind]||'🔔')+' '+esc(String(n.title))+'</div><div style="font-size:.6rem;color:var(--muted)">'+new Date(n.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</div></div><div style="color:var(--muted);line-height:1.4">'+esc(String(n.body||''))+'</div></div>';}).join('');}
+    function updateBadge(){const b=el('notifCount');if(!b)return;const unseen=items.filter(x=>!x.seen).length;if(unseen){b.textContent=unseen>99?'99+':unseen;b.style.display='flex';}else b.style.display='none';}
+    function toggle(){opened=!opened;el('notifPanel').style.display=opened?'flex':'none';if(opened){items.forEach(i=>i.seen=true);updateBadge();}}
+    function init(){const bell=el('notifBell');if(!bell)return;bell.style.display='flex';bell.onclick=toggle;el('notifClose').onclick=toggle;el('notifClearAll').onclick=()=>{items.length=0;render();updateBadge();};render();updateBadge();}
+    return {add,init,items};})();window.Notifications=Notifications;
+
   async function enterApp(){
     cleanupSession();
     updateHeaderUser();
+    Notifications.init();
+    const chOwn=sb.channel('rt-user-own-'+state.user.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'users',filter:'id=eq.'+state.user.id},payload=>{const oldBal=payload.old&&payload.old.balance,newBal=payload.new&&payload.new.balance;state.user=Object.assign({},state.user,payload.new);updateHeaderUser();if(oldBal!=null&&newBal!=null&&oldBal!==newBal){const diff=Number(newBal)-Number(oldBal);if(diff>0)Notifications.add('finance','Balance added','+'+birr(diff)+' birr');if(diff<0)Notifications.add('finance','Balance deducted','-'+birr(-diff)+' birr');}loadWallet().catch(()=>{});}).subscribe();state.channels.push(chOwn);
+    const chW=sb.channel('rt-wallet-own-'+state.user.id).on('postgres_changes',{event:'*',schema:'public',table:'wallet_transactions',filter:'user_id=eq.'+state.user.id},payload=>{const row=payload.new||payload.old;if(!row)return;const kind=row.type==='deposit'?'deposit':'withdraw',verb=row.status==='approved'?'approved':row.status==='rejected'?'rejected':'submitted';Notifications.add(kind,(kind==='deposit'?'Deposit ':'Withdraw ')+verb,birr(row.amount)+' birr'+(row.reference?' · '+row.reference:''));loadWallet().catch(()=>{});}).subscribe();state.channels.push(chW);
+    const chS=sb.channel('rt-support-mine-'+state.user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages',filter:'user_id=eq.'+state.user.id},payload=>{const m=payload.new;if(m&&m.sender==='admin')Notifications.add('chat','Admin replied',m.message);}).subscribe();state.channels.push(chS);
     if(state.user.is_admin){
+      const chAdmin=sb.channel('rt-admin-notif').on('postgres_changes',{event:'INSERT',schema:'public',table:'wallet_transactions'},payload=>{const w=payload.new;if(w)Notifications.add(w.type==='deposit'?'deposit':'withdraw','New '+w.type+' request',(w.user_name||'?')+' · '+birr(w.amount)+' birr'+(w.reference?' · '+w.reference:''));}).on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages'},payload=>{const m=payload.new;if(m&&m.sender==='user')Notifications.add('chat','New message',String(m.message||'').slice(0,80));}).subscribe();
+      state.channels.push(chAdmin);
       $('tabAdmin').style.display='block';
       buildPatternPicker();
       loadPasswordResetRequests();
@@ -3587,15 +3500,19 @@ window.AudioCaller=AudioCaller;
           '<div style="font-size:.66rem;color:'+color+';font-weight:800">'+r.status.toUpperCase()+'</div>'+
         '</div>'+
         '<div style="color:var(--muted);font-size:.66rem">'+new Date(r.created_at).toLocaleString()+'</div>'+
-        (isPending?'<div style="display:flex;gap:6px;margin-top:8px">'+
-          '<button class="gold mini" data-pwreset="'+r.id+'">Reset password</button>'+
+        (isPending?'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
+          '<button class="gold mini" data-pwotp="'+r.id+'">📨 Send OTP</button>'+
+          '<button class="ghost mini" data-pwreset="'+r.id+'">Reset manually</button>'+
           '<button class="ghost mini" data-pwdismiss="'+r.id+'">Dismiss</button>'+
         '</div>':'')+
       '</div>';
     }).join('');
     el.querySelectorAll('[data-pwreset]').forEach(b=>b.onclick=()=>adminResetPassword(b.dataset.pwreset));
+    el.querySelectorAll('[data-pwotp]').forEach(b=>b.onclick=()=>adminSendOtp(b.dataset.pwotp));
     el.querySelectorAll('[data-pwdismiss]').forEach(b=>b.onclick=()=>adminDismissReset(b.dataset.pwdismiss));
   }
+
+  async function adminSendOtp(requestId){if(!confirm('Generate a 6-digit code for this customer? It expires in 10 minutes.'))return;const {data,error}=await sb.rpc('admin_send_otp',{p_admin_id:state.user.id,p_request_id:requestId});if(error)return alert('Error: '+error.message);if(!data||!data.ok)return alert('Cannot: '+((data&&data.reason)||'failed'));const code=data.otp_code,name=data.customer_name||'Customer',phone=data.customer_phone||'';const msg='OTP for '+name+' ('+phone+'):\n\n   '+code+'\n\nValid for 10 minutes. Share this code with the customer privately.';try{if(navigator.clipboard)await navigator.clipboard.writeText(code);}catch(e){}alert(msg);await loadPasswordResetRequests();}
 
   async function adminResetPassword(requestId){
     const pwd=prompt('Enter a new temporary password for this customer (min 4 chars):');
@@ -3652,6 +3569,11 @@ window.AudioCaller=AudioCaller;
       else plEl.classList.remove('show');
     }
   }
+
+  function bindWalletHistoryControls(){const from=$('histFrom'),to=$('histTo');if(!from||!to)return;const today=new Date().toISOString().slice(0,10);if(!from.value)from.value=today;if(!to.value)to.value=today;document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{const r=b.dataset.range,now=new Date();let f=new Date();if(r==='today')f=now;else if(r==='week')f.setDate(now.getDate()-7);else if(r==='month')f.setMonth(now.getMonth()-1);else if(r==='all')f=new Date('2020-01-01');from.value=f.toISOString().slice(0,10);to.value=now.toISOString().slice(0,10);loadAdminHistory();});$('btnHistLoad').onclick=loadAdminHistory;$('btnHistPrint').onclick=printAdminHistory;$('btnHistCsv').onclick=exportAdminHistoryCsv;}
+  async function loadAdminHistory(){const from=$('histFrom').value,to=$('histTo').value,type=$('histType').value||null;if(!from||!to)return alert('Pick both dates');const {data:rows,error}=await sb.rpc('admin_wallet_history',{p_admin_id:state.user.id,p_from:from,p_to:to,p_type:type});if(error)return alert('Error: '+error.message);const {data:summary}=await sb.rpc('admin_wallet_summary',{p_admin_id:state.user.id,p_from:from,p_to:to});const totals=(summary||[]).reduce((a,r)=>{a.dep+=Number(r.deposits_sum||0);a.wd+=Number(r.withdrawals_sum||0);return a;},{dep:0,wd:0});$('histSummary').innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"><div style="background:rgba(16,185,129,.1);padding:8px;border-radius:10px;text-align:center"><div style="color:#10b981;font-weight:900;font-family:Poppins">'+birr(totals.dep)+'</div><div style="font-size:.55rem;color:var(--muted);text-transform:uppercase">Deposits</div></div><div style="background:rgba(239,68,68,.1);padding:8px;border-radius:10px;text-align:center"><div style="color:#ef4444;font-weight:900;font-family:Poppins">'+birr(totals.wd)+'</div><div style="font-size:.55rem;color:var(--muted);text-transform:uppercase">Withdraws</div></div><div style="background:rgba(251,191,36,.1);padding:8px;border-radius:10px;text-align:center"><div style="color:#fbbf24;font-weight:900;font-family:Poppins">'+birr(totals.dep-totals.wd)+'</div><div style="font-size:.55rem;color:var(--muted);text-transform:uppercase">Net</div></div></div>';const list=$('histList');if(!rows||!rows.length){list.innerHTML='<div style="text-align:center;color:var(--muted);padding:20px;font-size:.76rem">No transactions.</div>';return;}list.innerHTML=rows.map(r=>{const d=r.type==='deposit';return '<div style="background:rgba(7,12,26,.65);padding:9px 11px;border-radius:10px;margin-bottom:5px;font-size:.72rem;border-left:3px solid '+(d?'#10b981':'#ef4444')+'"><div style="display:flex;justify-content:space-between;gap:8px"><div style="font-weight:800;color:#fff">'+esc(r.user_name||'')+'</div><div style="font-family:Poppins;font-weight:900;color:'+(d?'#10b981':'#ef4444')+'">'+(d?'+':'-')+birr(r.amount)+'</div></div><div style="color:var(--muted);font-size:.62rem;margin-top:2px">'+esc(r.user_phone||'')+' · '+new Date(r.created_at).toLocaleString()+' · '+esc(r.status||'')+'</div>'+(r.sms_text?'<div style="color:var(--muted);font-size:.6rem;margin-top:4px;font-family:monospace;white-space:pre-wrap">📩 '+esc(r.sms_text)+'</div>':'')+'</div>';}).join('');}
+  function printAdminHistory(){const from=$('histFrom').value,to=$('histTo').value,win=window.open('','_blank');if(!win)return alert('Allow pop-ups to print history');win.document.write('<html><head><title>KEBE BINGO · Wallet History '+from+' → '+to+'</title><style>body{font-family:Arial;padding:20px;font-size:12px}div{margin-bottom:4px}</style></head><body><h2>KEBE BINGO · Wallet History</h2><div><strong>From:</strong> '+from+' &nbsp; <strong>To:</strong> '+to+'</div><hr>'+$('histSummary').innerHTML+$('histList').innerHTML+'</body></html>');win.document.close();win.print();}
+  function exportAdminHistoryCsv(){const rows=[['Date','User','Phone','Type','Amount','Status','Reference','SMS']];document.querySelectorAll('#histList > div').forEach(d=>rows.push([d.innerText.replace(/\n/g,' | ')]));const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');const blob=new Blob(['\ufeff'+csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='kebe-wallet-'+$('histFrom').value+'-to-'+$('histTo').value+'.csv';a.click();URL.revokeObjectURL(a.href);}
 
   function renderAdminFolder(name){
     const el=$('adminFolderContent');
@@ -3722,7 +3644,8 @@ window.AudioCaller=AudioCaller;
           '✅ AUTO-APPROVE MATCH</button>'+
           '<div class="msg" id="smsMsg"></div>'+
         '</div>';
-      renderWalletRequests(); bindSmsControls();
+      el.innerHTML+='<div class="panel" style="border:1px solid rgba(6,182,212,.35)"><h2 style="color:var(--accent)">📅 History by Date</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"><div><label style="font-size:.6rem;color:var(--muted);font-weight:700">From</label><input id="histFrom" type="date" /></div><div><label style="font-size:.6rem;color:var(--muted);font-weight:700">To</label><input id="histTo" type="date" /></div></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px"><button class="mini ghost" data-range="today">Today</button><button class="mini ghost" data-range="week">Week</button><button class="mini ghost" data-range="month">Month</button><button class="mini ghost" data-range="all">All</button></div><div style="display:flex;gap:6px;margin-bottom:10px"><select id="histType" style="flex:1"><option value="">All types</option><option value="deposit">Deposits only</option><option value="withdraw">Withdrawals only</option></select><button id="btnHistLoad" class="gold" style="width:auto;padding:12px 18px;margin:0">Load</button></div><div id="histSummary"></div><div id="histList" style="max-height:520px;overflow-y:auto;margin-top:10px"></div><div style="display:flex;gap:6px;margin-top:10px"><button id="btnHistPrint" class="ghost" style="flex:1">🖨 Print</button><button id="btnHistCsv" class="ghost" style="flex:1">📊 CSV</button></div></div>';
+      renderWalletRequests(); bindSmsControls(); bindWalletHistoryControls();
     }
     else if(name==='payouts'){
       el.innerHTML+=
@@ -4312,29 +4235,15 @@ window.AudioCaller=AudioCaller;
     const {data,error}=await sb.rpc('request_deposit',
       {p_user_id:state.user.id,p_amount:amount,p_reference:ref||null});
     if(error)return setMsg('walletMsg','Error: '+error.message,'var(--danger)');
-    if(!data.ok)return setMsg('walletMsg',data.reason,'var(--danger)');
+    if(!data.ok){if(data.reason==='too_soon')return setMsg('walletMsg','Please wait '+(data.wait_seconds||180)+'s before another deposit.','var(--danger)');return setMsg('walletMsg',data.reason,'var(--danger)');}
     setMsg('walletMsg','✅ Request sent. Pay '+amount+' birr to Telebirr '+TELEBIRR,'var(--mark)');
     $('depositAmount').value='';$('depositRef').value='';
     await loadWallet();
   };
-  $('btnWithdraw').onclick=async()=>{
-    const amount=parseFloat($('withdrawAmount').value);
-    const ref=$('withdrawRef').value.trim();
-    if(!amount||amount<MIN_WITHDRAW)return setMsg('walletMsg',
-     'Minimum withdraw is '+MIN_WITHDRAW+' birr','var(--danger)');
-    if(!ref)return setMsg('walletMsg','Enter your Telebirr number','var(--danger)');
-    setMsg('walletMsg','Submitting…','var(--accent)');
-    const {data,error}=await sb.rpc('request_withdraw',
-      {p_user_id:state.user.id,p_amount:amount,p_reference:ref});
-    if(error)return setMsg('walletMsg','Error: '+error.message,'var(--danger)');
-    if(!data.ok){
-      if(data.reason==='insufficient')return setMsg('walletMsg','Insufficient balance','var(--danger)');
-      return setMsg('walletMsg',data.reason,'var(--danger)');
-    }
-    setMsg('walletMsg','✅ Withdrawal request sent.','var(--mark)');
-    $('withdrawAmount').value='';
-    await loadWallet();
-  };
+  $('btnWithdraw').onclick=async()=>{const amount=parseFloat($('withdrawAmount').value),ref=$('withdrawRef').value.trim(),sms=$('withdrawSms').value.trim();if(!amount||amount<MIN_WITHDRAW)return setMsg('walletMsg','Minimum withdraw is '+MIN_WITHDRAW+' birr','var(--danger)');if(!ref)return setMsg('walletMsg','Enter your Telebirr number','var(--danger)');if(!sms||sms.length<10)return setMsg('walletMsg','Paste the Telebirr SMS you received','var(--danger)');setMsg('walletMsg','Submitting…','var(--accent)');const {data,error}=await sb.rpc('request_withdraw',{p_user_id:state.user.id,p_amount:amount,p_reference:ref,p_sms_text:sms});if(error)return setMsg('walletMsg','Error: '+error.message,'var(--danger)');if(!data.ok){if(data.reason==='too_soon'){startCooldown(data.wait_seconds||180,'withdraw');return setMsg('walletMsg','Please wait '+(data.wait_seconds||180)+'s before another request.','var(--danger)');}if(data.reason==='insufficient')return setMsg('walletMsg','Insufficient balance','var(--danger)');if(data.reason==='missing_sms')return setMsg('walletMsg','Paste the Telebirr SMS first','var(--danger)');return setMsg('walletMsg',data.reason,'var(--danger)');}setMsg('walletMsg','✅ Withdrawal request sent.','var(--mark)');$('withdrawAmount').value='';$('withdrawSms').value='';startCooldown(180,'withdraw');await Promise.all([loadUser(),loadWallet()]);updateHeaderUser();};
+  function startCooldown(seconds,which){const el=which==='withdraw'?$('withdrawCooldown'):null,btn=which==='withdraw'?$('btnWithdraw'):$('btnDeposit');if(!el||!btn)return;let remain=seconds;btn.disabled=true;el.style.display='block';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);el.style.display='none';btn.disabled=false;return;}el.textContent='⏱ Next request in '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0');},1000);el.textContent='⏱ Next request in '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0');};
+  if($('walletHistoryToggle'))$('walletHistoryToggle').onclick=()=>{const w=$('walletHistoryWrap'),c=$('walletHistoryChevron'),open=w.style.display!=='none';w.style.display=open?'none':'block';c.style.transform=open?'rotate(0deg)':'rotate(180deg)';};
+  let walletHistoryFilter=null;document.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-hist]').forEach(x=>x.classList.remove('gold'));b.classList.add('gold');walletHistoryFilter=b.dataset.hist;renderWalletHistory();});
   function renderWalletHistory(){
     const el=$('walletHistory');if(!el)return;el.innerHTML='';
     if(!state.walletTx.length){
@@ -4342,7 +4251,9 @@ window.AudioCaller=AudioCaller;
         '<span class="we-icon">📭</span>No transactions yet.</div>';
       return;
     }
-    state.walletTx.forEach(t=>{
+    let historyRows=state.walletTx||[];if(walletHistoryFilter)historyRows=historyRows.filter(t=>t.type===walletHistoryFilter);
+    if(!historyRows.length){el.innerHTML='<div class="wallet-empty"><span class="we-icon">📭</span>No transactions.</div>';return;}
+    historyRows.forEach(t=>{
       const isCredit=t.type==='deposit';
       const row=document.createElement('div');
       row.className='wallet-history-item '+(isCredit?'deposit':'withdraw');
@@ -4455,29 +4366,8 @@ window.AudioCaller=AudioCaller;
     setMsg('gameMsg','Not a bingo yet.','var(--danger)');
     setTimeout(()=>setMsg('gameMsg',''),1500);
   };
-  function renderWinners(){
-    const el=$('winnerBoard');el.innerHTML='';
-    if(!state.winners.length){el.innerHTML='<div style="color:var(--muted);'+
-      'text-align:center;padding:20px;font-size:.84rem">No winners yet.</div>';return;}
-    state.winners.forEach(w=>{
-      const row=document.createElement('div');
-      row.style.cssText='background:rgba(7,12,26,.7);padding:11px 13px;'+
-        'border-radius:11px;display:flex;justify-content:space-between;'+
-        'align-items:center;font-size:.78rem;gap:8px;'+
-        'border:1px solid rgba(148,163,184,.1);border-left:3px solid var(--mark)';
-      const roundTag=w.round_number?'Round #'+w.round_number:'';
-      const slotTag=w.winner_slot?' · Card #'+w.winner_slot:'';
-      const patTag=w.pattern?' · '+(PATTERN_LABEL[w.pattern]||w.pattern):'';
-      const prize=storedDisplayCounts(w).prize;
-      row.innerHTML='<div style="flex:1"><div style="font-weight:800">🏆 '+
-        (w.winner_name||'Unknown')+'</div><div style="color:var(--muted);font-size:.66rem">'+
-        roundTag+slotTag+patTag+'</div><div style="color:var(--muted);font-size:.64rem">'+
-        new Date(w.ended_at||w.created_at).toLocaleString()+'</div></div>'+
-        '<div style="color:var(--mark);font-weight:900;font-family:Poppins,sans-serif">'+
-        birr(prize)+' birr</div>';
-      el.appendChild(row);
-    });
-  }
+  async function renderWinners(){const el=$('winnerBoard');if(!el)return;const {data:rounds}=await sb.from('rounds').select('*').eq('status','finished').order('ended_at',{ascending:false}).limit(30);if(!rounds||!rounds.length){el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.84rem">No winners yet.</div>';return;}const ids=rounds.map(r=>r.id),{data:cards}=await sb.from('card_pool').select('*').in('round_id',ids).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true});const cardMap={};(cards||[]).forEach(c=>(cardMap[c.round_id]=cardMap[c.round_id]||[]).push(c));el.innerHTML='';rounds.forEach(r=>{const winners=cardMap[r.id]||[],count=winners.length;if(count===0&&r.winner_name==='No winner')return;const perWinner=Number(r.winner_prize||0),row=document.createElement('div');row.style.cssText='background:rgba(7,12,26,.7);padding:11px 13px;border-radius:11px;margin-bottom:6px;font-size:.76rem;border:1px solid rgba(148,163,184,.1);border-left:3px solid var(--mark)';const header='<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div style="font-weight:800">Round #'+(r.round_number||'—')+' · '+(PATTERN_LABEL[r.pattern]||'Line')+'</div><div style="color:var(--muted);font-size:.66rem">'+count+(count===1?' winner':' winners')+' · '+new Date(r.ended_at||r.created_at).toLocaleString()+'</div></div><div style="color:var(--mark);font-weight:900;font-family:Poppins,sans-serif">'+birr(perWinner*count)+' birr</div></div>';const list=winners.map(c=>'<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(148,163,184,.12)"><span style="font-weight:700">'+(c.is_bot?'🤖 ':'👤 ')+esc(c.user_name||'?')+'</span> · Card #'+c.slot_number+'<span style="color:var(--mark);float:right">'+birr(perWinner)+' birr</span></div>').join('');row.innerHTML=header+list;el.appendChild(row);});if(!el.innerHTML)el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:.84rem">No winners yet.</div>';}
+
   function buildPatternPicker(){
     const el=$('patternPicker');if(!el||el.dataset.built==='1')return;
     el.dataset.built='1';
@@ -5123,11 +5013,6 @@ window.AudioCaller=AudioCaller;
         if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status))
           scheduleResync('calls-'+status);
       }));
-    state.channels.push(sb.channel('rt-user-'+state.user.id)
-      .on('postgres_changes',
-        {event:'UPDATE',schema:'public',table:'users',filter:'id=eq.'+state.user.id},
-        payload=>{state.user=Object.assign({},state.user,payload.new);updateHeaderUser();})
-      .subscribe());
     state.channels.push(sb.channel('rt-pool-'+roundId)
       .on('postgres_changes',
         {event:'*',schema:'public',table:'card_pool',filter:'round_id=eq.'+roundId},
@@ -5141,15 +5026,6 @@ window.AudioCaller=AudioCaller;
         .on('postgres_changes',{event:'*',schema:'public',table:'support_messages'},
           async()=>{await loadHelpInbox();
             if(state.currentHelpUser)openHelpChat(state.currentHelpUser);})
-        .subscribe());
-    }else{
-      state.channels.push(sb.channel('rt-support-mine')
-        .on('postgres_changes',
-          {event:'*',schema:'public',table:'support_messages',
-           filter:'user_id=eq.'+state.user.id},
-          async()=>{await loadUserSupport();
-            if(!document.querySelector('.tab[data-tab="help"].active'))
-              await updateUserHelpBadge();})
         .subscribe());
     }
   }
