@@ -1954,14 +1954,6 @@
             </button>
           </div>
           <div class="wallet-bank-row">
-            <div class="wallet-bank-icon" aria-hidden="true">📱</div>
-            <div class="wallet-bank-info">
-              <div class="wallet-bank-title">Telebirr</div>
-              <div class="wallet-bank-number">0945657111</div>
-              <div class="wallet-bank-name">Account name: Daniel Getachew</div>
-            </div>
-          </div>
-          <div class="wallet-bank-row">
             <div class="wallet-bank-icon" aria-hidden="true">🏦</div>
             <div class="wallet-bank-info">
               <div class="wallet-bank-title">CBE · Commercial Bank of Ethiopia</div>
@@ -2464,15 +2456,17 @@ function startApp(){
 /* ═══════ HARD KILL: MP3 CALLER ONLY, NO TTS ═══════ */
 window.__useMp3Caller = true;
 if('speechSynthesis' in window){
-  const _origSpeak = speechSynthesis.speak.bind(speechSynthesis);
+  const _origSpeak  = speechSynthesis.speak.bind(speechSynthesis);
+  const _origCancel = speechSynthesis.cancel.bind(speechSynthesis);
   speechSynthesis.speak = function(u){
-    if(window.__useMp3Caller){
-      console.log('[tts blocked]', u && u.text);
-      return;
-    }
-    return _origSpeak(u);
+    console.log('[tts blocked]', u && u.text);
+    return;
   };
-  speechSynthesis.cancel = function(){ /* no-op while MP3 mode */ };
+  speechSynthesis.cancel = function(){
+    try{ _origCancel(); }catch(e){}
+  };
+  // Empty any TTS queue left over from a previous page load
+  try{ _origCancel(); }catch(e){}
 }
   const $=id=>document.getElementById(id);
   const state={
@@ -2485,7 +2479,7 @@ if('speechSynthesis' in window){
     channels:[],drawTimer:null,countdownTimer:null,botCheckTimer:null,
     healthTimer:null,ensureTimer:null,ballTimeout:null,latestTimeout:null,
     cornerPopTimeout:null,ball3DTimeout:null,
-    lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,winCloseTick:null,winCloseTick:null,
+    lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,winCloseTick:null,
     presentationQueue:[],presentationRunning:false,presentationStartedAt:0,presentationEpoch:0,
     currentlyShowingRoundId:null,lastPatternShownFor:null,
     adminSelectedPattern:'random',adminFolder:null,
@@ -2695,6 +2689,46 @@ const WinnerVoice=(function(){
 })();
 window.WinnerVoice=WinnerVoice;
 
+/* ═══════════════════════════════════════════════════════════
+   STARTING VOICE — plays ./starting.mp3 when the round cinematic opens
+   ═══════════════════════════════════════════════════════════ */
+const StartingVoice=(function(){
+  const FILE='./starting.mp3';
+  let currentAudio=null;
+  let playing=false;
+
+  function play(){
+    if(playing) return Promise.resolve(false);
+    playing=true;
+    return new Promise(resolve=>{
+      try{
+        const a=new Audio(FILE);
+        a.volume=1;
+        currentAudio=a;
+        a.onended=()=>{ currentAudio=null; playing=false; resolve(true); };
+        a.onerror=()=>{ currentAudio=null; playing=false;
+          console.warn('[StartingVoice] load failed:',FILE); resolve(false); };
+        const p=a.play();
+        if(p&&p.catch)p.catch(err=>{
+          currentAudio=null; playing=false;
+          console.warn('[StartingVoice] play blocked:',err.name);
+          resolve(false);
+        });
+      }catch(e){ playing=false; console.warn('[StartingVoice]',e); resolve(false); }
+    });
+  }
+
+  function stop(){
+    try{
+      if(currentAudio){ currentAudio.pause(); currentAudio.currentTime=0; currentAudio=null; }
+    }catch(e){}
+    playing=false;
+  }
+
+  return { play, stop };
+})();
+window.StartingVoice=StartingVoice;
+
 
   function speakText(text,lang){
     if(!('speechSynthesis' in window))return;
@@ -2899,7 +2933,8 @@ window.WinnerVoice=WinnerVoice;
 
     if(!_rcine.spokeStart){
       _rcine.spokeStart = true;
-      speakBingoMessage('gameStart');
+      // 🔊 Play ./starting.mp3 — the round-opening announcement.
+      if(state.voiceOn && window.StartingVoice) StartingVoice.play().catch(()=>{});
     }
   }
 
@@ -2909,6 +2944,7 @@ window.WinnerVoice=WinnerVoice;
     el.classList.remove('show');
     _rcine.active = false;
     rcineStopRumble();
+    if(window.StartingVoice) StartingVoice.stop();
   }
 
   /* Called once per second from the countdown loop. */
@@ -2921,7 +2957,7 @@ window.WinnerVoice=WinnerVoice;
         const lv = document.getElementById('rcineLive');
         if(lv && !lv.classList.contains('show')){
           lv.classList.add('show');
-          speakBingoMessage('live');
+          /* Live voice removed — the visual "LIVE" pill is enough. */
         }
         // Small beat, then hide
         if(!_rcine.hideTimer){
@@ -3103,8 +3139,7 @@ window.WinnerVoice=WinnerVoice;
     $('pmDesc').textContent=PATTERN_DESC[round.pattern]||'';
     renderPatternGrid($('pmGrid'),round.pattern,'pc');
     $('patternModal').classList.add('show');
-    setTimeout(()=>speakText('Round '+(round.round_number||'')+
-      '. Winning pattern: '+(PATTERN_LABEL[round.pattern]||round.pattern),'en-US'),300);
+    /* Pattern voice removed — the on-screen modal is enough. */
   }
   $('btnPmGotIt').onclick=()=>$('patternModal').classList.remove('show');
 
@@ -3286,12 +3321,14 @@ window.WinnerVoice=WinnerVoice;
     localStorage.setItem('bingo_voice',state.voiceOn?'1':'0');
     $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');
     if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();
+    if(!state.voiceOn && window.StartingVoice) StartingVoice.stop();
   };
   $('btnToggleVoice').onclick=()=>{state.voiceOn=!state.voiceOn;
     $('voiceOn').checked=state.voiceOn;
     localStorage.setItem('bingo_voice',state.voiceOn?'1':'0');
     $('btnToggleVoice').textContent='🔊 Voice: '+(state.voiceOn?'ON':'OFF');
     if(!state.voiceOn && window.WinnerVoice) WinnerVoice.stop();
+    if(!state.voiceOn && window.StartingVoice) StartingVoice.stop();
   };
 
   $('btnLogin').onclick=async()=>{
