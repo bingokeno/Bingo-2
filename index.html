@@ -2446,9 +2446,21 @@ function startApp(){
   const CARD_PRICE=10;
   const MIN_DEPOSIT=100;
   const MIN_WITHDRAW=50;
-  const WIN_AUTO_CLOSE_MS=20000;
+  const WIN_AUTO_CLOSE_MS=15000;
 
   const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+  /* Prime winner.mp3 on the first user tap so the browser whitelists it
+     for later autoplay when a round ends. Fires at most once per page load. */
+  document.addEventListener('pointerdown', function primeWinnerAudio(){
+    try{
+      const a=new Audio('./winner.mp3');
+      a.muted=true;
+      a.play().then(()=>{ a.pause(); a.currentTime=0; a.muted=false; }).catch(()=>{});
+    }catch(e){}
+    document.removeEventListener('pointerdown', primeWinnerAudio);
+  },{once:true});
+
 /* ═══════ HARD KILL: MP3 CALLER ONLY, NO TTS ═══════ */
 window.__useMp3Caller = true;
 if('speechSynthesis' in window){
@@ -2473,7 +2485,7 @@ if('speechSynthesis' in window){
     channels:[],drawTimer:null,countdownTimer:null,botCheckTimer:null,
     healthTimer:null,ensureTimer:null,ballTimeout:null,latestTimeout:null,
     cornerPopTimeout:null,ball3DTimeout:null,
-    lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,winCloseTick:null,
+    lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,winCloseTick:null,winCloseTick:null,
     presentationQueue:[],presentationRunning:false,presentationStartedAt:0,presentationEpoch:0,
     currentlyShowingRoundId:null,lastPatternShownFor:null,
     adminSelectedPattern:'random',adminFolder:null,
@@ -3138,47 +3150,83 @@ window.WinnerVoice=WinnerVoice;
   async function showWinner(r){
     if(!r || state.currentlyShowingRoundId===r.id) return;
     if(r.status && r.status !== 'finished') return;
+
+    // Fallback so a bot's name still shows even if the pool query is empty.
+    if(!r.winner_name || r.winner_name === 'No winner'){
+      r.winner_name = 'Winner';
+    }
+    state.currentlyShowingRoundId=r.id;
+
     const [{data:winners},{data:allCalls}]=await Promise.all([
       sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid')
         .order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),
       sb.from('calls').select('number').eq('round_id',r.id)
     ]);
+
     const winnerList=winners||[];
-    // Keep the winner overlay available even when the paid-card query returns no rows.
-    // Supabase may still have the winning bot recorded on the round.
-    state.currentlyShowingRoundId=r.id;
     const calledSet=new Set((allCalls||[]).map(c=>c.number));
-    const count=winnerList.length||1,perWinner=Number(r.winner_prize||0);
+    const count=winnerList.length||1;
+    const perWinner=Number(r.winner_prize||0);
     const totalPrize=Number(r.prize_amount||perWinner*count);
+
     $('winRoundLine').textContent='ROUND #'+(r.round_number||'—');
-    $('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');
-    $('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name||'Winner'):'🏆 '+count+' Winners';
-    $('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';
+    $('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+
+      ' · '+count+(count===1?' winner':' winners');
+    $('winWinnerName').textContent=count===1
+      ? '🏆 '+(winnerList[0]?.user_name||r.winner_name)
+      : '🏆 '+count+' Winners';
+    $('winDetails').textContent=count===1
+      ? 'Card #'+(winnerList[0]?.slot_number||r.winner_slot)
+      : 'Each receives '+birr(perWinner)+' birr';
     $('winPrizeBig').textContent=birr(totalPrize)+' birr total';
-    const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';
-    wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';
+
+    const wrap=$('winCardWrap');
+    wrap.innerHTML='';
+    wrap.style.display='flex';
+    wrap.style.flexWrap='wrap';
+    wrap.style.justifyContent='center';
+    wrap.style.gap='6px';
+    wrap.style.maxHeight='55vh';
+    wrap.style.overflowY='auto';
+
     winnerList.forEach(card=>{
       const c=document.createElement('div');c.className='card';
       const header=document.createElement('div');header.className='card-header';
-      ['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});
-      c.appendChild(header);const g=document.createElement('div');g.className='grid';
+      ['B','I','N','G','O'].forEach(L=>{
+        const d=document.createElement('div');d.textContent=L;header.appendChild(d);
+      });
+      c.appendChild(header);
+      const g=document.createElement('div');g.className='grid';
       const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);
       for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){
-        const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';
+        const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');
+        cell.className='cell';
         if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}
         else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}
-        if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);
+        if(lineIdx.includes(idx))cell.classList.add('winline');
+        g.appendChild(cell);
       }
-      c.appendChild(g);const label=document.createElement('div');
+      c.appendChild(g);
+      const label=document.createElement('div');
       label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';
-      label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);
+      label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;
+      c.appendChild(label);
+      wrap.appendChild(c);
     });
-    $('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();
+
+    $('winOverlay').classList.add('show');
+    spawnConfetti();
+    playBingoFanfare();
+
+    // 🔊 winner.mp3 — fires exactly when the overlay appears
     if(state.voiceOn && window.WinnerVoice) WinnerVoice.play().catch(()=>{});
-    // Clear both timers before starting a fresh auto-close countdown.
+
+    // Clear any previous timers before starting a fresh 15s countdown
     clearInterval(state.winCloseTick);state.winCloseTick=null;
     clearTimeout(state.winCloseTimer);state.winCloseTimer=null;
-    const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);
+
+    const btn=$('btnWinDismiss');
+    let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);
     btn.textContent='CLOSE (auto in '+remain+'s)';
     state.winCloseTick=setInterval(()=>{
       remain--;
