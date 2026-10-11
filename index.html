@@ -940,6 +940,32 @@
   .telebirr-box .tb-help a{
     color:var(--gold);font-weight:800;text-decoration:none;
   }
+  /* Wallet deposit/withdraw toggle tabs and submission status */
+  .wallet-action-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
+  .wallet-action-tab{margin:0;padding:12px 10px;border-radius:12px;
+    background:rgba(30,41,59,.75);color:var(--muted);border:1px solid rgba(148,163,184,.18);
+    box-shadow:none;font-weight:900;letter-spacing:.4px}
+  .wallet-action-tab.active{background:linear-gradient(135deg,#10b981,#059669);
+    color:#fff;border-color:transparent;box-shadow:0 8px 22px rgba(16,185,129,.28)}
+  .wallet-action-tab[data-wallet-tab="withdraw"].active{background:linear-gradient(135deg,#06b6d4,#0891b2);color:#02121a}
+  .wallet-section.wallet-hidden{display:none!important}
+  .wallet-bank-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid rgba(148,163,184,.12)}
+  .wallet-bank-icon{width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;border-radius:11px;background:rgba(255,255,255,.08);font-size:1.35rem}
+  .wallet-bank-info{min-width:0;flex:1}
+  .wallet-bank-title{font-weight:900;font-size:.8rem;color:#fff}
+  .wallet-bank-number{font-family:monospace;font-weight:900;letter-spacing:.5px;font-size:.88rem;margin-top:3px}
+  .wallet-bank-name{font-size:.66rem;color:var(--muted);margin-top:3px}
+  .wallet-send-status{display:none;margin-top:12px;padding:14px;border-radius:13px;text-align:center;
+    background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(16,185,129,.1));
+    border:1px solid rgba(6,182,212,.28);color:var(--text);font-size:.78rem;line-height:1.5}
+  .wallet-send-status.show{display:block}
+  .wallet-send-orbit{width:42px;height:42px;border:3px solid rgba(6,182,212,.2);
+    border-top-color:#06b6d4;border-right-color:#10b981;border-radius:50%;
+    margin:0 auto 10px;animation:walletOrbit .8s linear infinite}
+  .wallet-send-status.done .wallet-send-orbit{display:none}
+  .wallet-send-status.failed{border-color:rgba(239,68,68,.45);color:#fecaca}
+  @keyframes walletOrbit{to{transform:rotate(360deg)}}
   .wallet-history-item{
     display:flex;justify-content:space-between;align-items:center;
     gap:10px;padding:12px;border-radius:12px;margin-bottom:6px;
@@ -1892,7 +1918,12 @@
         <div class="wh-amount" id="walletBalance">0 birr</div>
       </div>
 
-      <div class="wallet-section deposit">
+      <div class="wallet-action-tabs" role="tablist" aria-label="Wallet action">
+        <button type="button" class="wallet-action-tab active" data-wallet-tab="deposit" role="tab" aria-selected="true">⬇️ Deposit</button>
+        <button type="button" class="wallet-action-tab" data-wallet-tab="withdraw" role="tab" aria-selected="false">⬆️ Withdraw</button>
+      </div>
+
+      <div class="wallet-section deposit" id="walletDepositSection">
         <div class="ws-header">
           <div class="ws-badge">⬇️</div>
           <div>
@@ -1922,6 +1953,23 @@
               <span>Copy</span><span id="copyIcon2">📋</span>
             </button>
           </div>
+          <div class="wallet-bank-row">
+            <div class="wallet-bank-icon" aria-hidden="true">📱</div>
+            <div class="wallet-bank-info">
+              <div class="wallet-bank-title">Telebirr</div>
+              <div class="wallet-bank-number">0945657111</div>
+              <div class="wallet-bank-name">Account name: Daniel Getachew</div>
+            </div>
+          </div>
+          <div class="wallet-bank-row">
+            <div class="wallet-bank-icon" aria-hidden="true">🏦</div>
+            <div class="wallet-bank-info">
+              <div class="wallet-bank-title">CBE · Commercial Bank of Ethiopia</div>
+              <div class="wallet-bank-number">1000657206176</div>
+              <div class="wallet-bank-name">Account name: Daniel Getachew</div>
+            </div>
+            <button class="copy-btn" type="button" id="btnCopyCBE">Copy</button>
+          </div>
           <div class="tb-help">
             After sending, forward your Telebirr SMS screenshot to
             <a href="https://t.me/danielgetachew" target="_blank">@danielgetachew</a>
@@ -1930,7 +1978,7 @@
         </div>
       </div>
 
-      <div class="wallet-section withdraw">
+      <div class="wallet-section withdraw wallet-hidden" id="walletWithdrawSection">
         <div class="ws-header">
           <div class="ws-badge">⬆️</div>
           <div>
@@ -1952,6 +2000,9 @@
 
       <div class="wallet-section" style="color:var(--accent)"><div class="ws-header" style="cursor:pointer" id="walletHistoryToggle"><div class="ws-badge" style="background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 8px 20px rgba(99,102,241,.4)">📜</div><div style="flex:1"><div class="ws-title">Transaction History</div><div class="ws-desc">Tap to expand</div></div><div id="walletHistoryChevron" style="font-size:1.4rem;color:var(--muted);transition:transform .2s">▾</div></div><div id="walletHistoryWrap" style="display:none;margin-top:10px"><div style="display:flex;gap:6px;margin-bottom:10px"><button class="mini ghost" data-hist="deposit" style="flex:1">⬇️ Deposits</button><button class="mini ghost" data-hist="withdraw" style="flex:1">⬆️ Withdrawals</button></div><div id="walletHistory"></div></div></div>
 
+      <div class="wallet-send-status" id="walletSendStatus" role="status" aria-live="polite">
+        <div class="wallet-send-orbit"></div><div class="wallet-send-message">Preparing your request…</div>
+      </div>
       <div class="msg" id="walletMsg"></div>
     </div>
 
@@ -2422,7 +2473,7 @@ if('speechSynthesis' in window){
     channels:[],drawTimer:null,countdownTimer:null,botCheckTimer:null,
     healthTimer:null,ensureTimer:null,ballTimeout:null,latestTimeout:null,
     cornerPopTimeout:null,ball3DTimeout:null,
-    lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,
+    lastCallReceivedAt:0,voiceOn:true,winCloseTimer:null,winCloseTick:null,
     presentationQueue:[],presentationRunning:false,presentationStartedAt:0,presentationEpoch:0,
     currentlyShowingRoundId:null,lastPatternShownFor:null,
     adminSelectedPattern:'random',adminFolder:null,
@@ -2476,6 +2527,11 @@ if('speechSynthesis' in window){
     if(window.__aiRefresh && $('aiPanel') && $('aiPanel').classList.contains('show')
        && $('aiAnalyze') && $('aiAnalyze').style.display!=='none'){
       window.__aiRefresh();
+    }
+    // Refresh translated live-board and player-panel labels after a language change.
+    if(state.round && $('liveRoundLabel')){
+      renderRound();
+      renderPlayersPanel(state.round);
     }
   }
 
@@ -2705,7 +2761,7 @@ window.WinnerVoice=WinnerVoice;
     _lastCount:null,
     spokeStart:false,
     hideTimer:null,
-    rumbleRaf:null
+    rumbleRaf:null,innerBalls:null
   };
 
   function rcineSpawnParticles(){
@@ -2732,52 +2788,39 @@ window.WinnerVoice=WinnerVoice;
     const el = document.getElementById('rcineInnerBalls');
     if(!el) return;
 
-    // Rebuild each time the intro shows, so numbers are fresh per round
-    el.innerHTML='';
-    const colorClasses=['','c','r','p','g',''];
-    const pool = new Set();
-    while(pool.size < _rcine.innerBallCount){
-      pool.add(1 + Math.floor(Math.random()*75));
-    }
-    const nums = [...pool];
-
-    // Layout: place each ball inside a disc (deterministic starting positions)
-    const balls = nums.map((n,i)=>{
-      const d=document.createElement('div');
-      d.className='ib '+colorClasses[i % colorClasses.length];
-      d.textContent=n;
-      el.appendChild(d);
-      const r = 34 * Math.random();
-      const a = 2*Math.PI*Math.random();
-      return {
-        el:d,
-        cx: 50 + r*Math.cos(a),   // % coords
-        cy: 50 + r*Math.sin(a),
-        // per-ball phase & speed
-        ph: Math.random()*Math.PI*2,
-        sp: 0.8 + Math.random()*1.6,
-        rr: 0.6 + Math.random()*1.4
-      };
-    });
-
-    if(_rcine.rumbleRaf) cancelAnimationFrame(_rcine.rumbleRaf);
-    const start = performance.now();
-    function step(t){
-      const t0 = (t-start)/1000;
-      // Balls jiggle in place; stronger during the intro
-      balls.forEach((b,i)=>{
-        const jx = Math.sin(t0*6*b.sp + b.ph) * b.rr * 2.6;
-        const jy = Math.cos(t0*7*b.sp + b.ph) * b.rr * 2.6;
-        b.el.style.left = (b.cx + jx)+'%';
-        b.el.style.top  = (b.cy + jy)+'%';
-        b.el.style.transform = 'translate(-50%,-50%) scale('+
-          (0.94 + Math.sin(t0*5 + b.ph)*0.06).toFixed(3)+')';
-      });
-      if(_rcine.active){
-        _rcine.rumbleRaf = requestAnimationFrame(step);
+    // Build DOM nodes once; later rounds only refresh the numbers and animation.
+    if(!_rcine.innerBalls || _rcine.innerBalls.length !== _rcine.innerBallCount){
+      el.innerHTML='';
+      const colorClasses=['','c','r','p','g',''];
+      _rcine.innerBalls=[];
+      for(let i=0;i<_rcine.innerBallCount;i++){
+        const d=document.createElement('div');
+        d.className='ib '+colorClasses[i % colorClasses.length];
+        el.appendChild(d);
+        const r=34*Math.random(),a=2*Math.PI*Math.random();
+        _rcine.innerBalls.push({el:d,cx:50+r*Math.cos(a),cy:50+r*Math.sin(a),
+          ph:Math.random()*Math.PI*2,sp:0.8+Math.random()*1.6,rr:0.6+Math.random()*1.4});
       }
     }
-    _rcine.rumbleRaf = requestAnimationFrame(step);
+    const pool=new Set();
+    while(pool.size < _rcine.innerBalls.length) pool.add(1+Math.floor(Math.random()*75));
+    [...pool].forEach((n,i)=>{_rcine.innerBalls[i].el.textContent=n;});
+
+    if(_rcine.rumbleRaf) cancelAnimationFrame(_rcine.rumbleRaf);
+    const start=performance.now();
+    function step(t){
+      const t0=(t-start)/1000;
+      _rcine.innerBalls.forEach(b=>{
+        const jx=Math.sin(t0*6*b.sp+b.ph)*b.rr*2.6;
+        const jy=Math.cos(t0*7*b.sp+b.ph)*b.rr*2.6;
+        b.el.style.left=(b.cx+jx)+'%';
+        b.el.style.top=(b.cy+jy)+'%';
+        b.el.style.transform='translate(-50%,-50%) scale('+(0.94+Math.sin(t0*5+b.ph)*0.06).toFixed(3)+')';
+      });
+      if(_rcine.active) _rcine.rumbleRaf=requestAnimationFrame(step);
+      else _rcine.rumbleRaf=null;
+    }
+    _rcine.rumbleRaf=requestAnimationFrame(step);
   }
 
   function rcineStopRumble(){
@@ -2998,27 +3041,6 @@ window.WinnerVoice=WinnerVoice;
     }
     autoDaubAll();
 
-    // 🔥 NEW: If this was a live call and I'm the current player,
-    // auto-detect any of MY cards that match the pattern right now.
-    // This fires the same RPC as pressing BINGO, so the server
-    // marks my card `won = true` and settle_round will end the round.
-    if(!silent && state.user && state.round
-       && state.round.status === 'playing'
-       && state.myPaidCards.length > 0){
-      sb.rpc('auto_claim_my_cards', {
-        p_user_id:  state.user.id,
-        p_round_id: state.round.id
-      }).then(r => {
-        const n = r && r.data && r.data.new_winners;
-        if(n > 0){
-          console.log('[auto-win] matched', n, 'of my cards');
-          // Refresh so the win overlay can fire once the round finishes
-          loadRound().catch(()=>{});
-        }
-      }).catch(err => {
-        console.warn('[auto-win] failed:', err && err.message);
-      });
-    }
 
     const roundIsPlaying=!!(state.round&&state.round.status==='playing');
     const liveChannelCall=!!(sourceRoundId&&state.round&&state.round.id===sourceRoundId);
@@ -3077,6 +3099,7 @@ window.WinnerVoice=WinnerVoice;
   function hideWinner(){
     $('winOverlay').classList.remove('show');
     clearTimeout(state.winCloseTimer);state.winCloseTimer=null;
+    clearInterval(state.winCloseTick);state.winCloseTick=null;
     $('winConfetti').innerHTML='';
   }
   $('btnWinX').onclick=hideWinner;
@@ -3113,17 +3136,60 @@ window.WinnerVoice=WinnerVoice;
     return PATTERN_CELLS[pattern]||[];
   }
   async function showWinner(r){
-  if(!r || state.currentlyShowingRoundId===r.id) return;
-  if(r.status && r.status !== 'finished') return;
-  if(!r.winner_name || r.winner_name === 'No winner'){
-    // Allow overlay even if name is missing — a finished round always deserves it
-    r.winner_name = r.winner_name || 'Winner';
+    if(!r || state.currentlyShowingRoundId===r.id) return;
+    if(r.status && r.status !== 'finished') return;
+    const [{data:winners},{data:allCalls}]=await Promise.all([
+      sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid')
+        .order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),
+      sb.from('calls').select('number').eq('round_id',r.id)
+    ]);
+    const winnerList=winners||[];
+    // Keep the winner overlay available even when the paid-card query returns no rows.
+    // Supabase may still have the winning bot recorded on the round.
+    state.currentlyShowingRoundId=r.id;
+    const calledSet=new Set((allCalls||[]).map(c=>c.number));
+    const count=winnerList.length||1,perWinner=Number(r.winner_prize||0);
+    const totalPrize=Number(r.prize_amount||perWinner*count);
+    $('winRoundLine').textContent='ROUND #'+(r.round_number||'—');
+    $('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');
+    $('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name||'Winner'):'🏆 '+count+' Winners';
+    $('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';
+    $('winPrizeBig').textContent=birr(totalPrize)+' birr total';
+    const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';
+    wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';
+    winnerList.forEach(card=>{
+      const c=document.createElement('div');c.className='card';
+      const header=document.createElement('div');header.className='card-header';
+      ['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});
+      c.appendChild(header);const g=document.createElement('div');g.className='grid';
+      const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);
+      for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){
+        const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';
+        if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}
+        else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}
+        if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);
+      }
+      c.appendChild(g);const label=document.createElement('div');
+      label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';
+      label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);
+    });
+    $('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();
+    if(state.voiceOn && window.WinnerVoice) WinnerVoice.play().catch(()=>{});
+    // Clear both timers before starting a fresh auto-close countdown.
+    clearInterval(state.winCloseTick);state.winCloseTick=null;
+    clearTimeout(state.winCloseTimer);state.winCloseTimer=null;
+    const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);
+    btn.textContent='CLOSE (auto in '+remain+'s)';
+    state.winCloseTick=setInterval(()=>{
+      remain--;
+      if(remain<=0){clearInterval(state.winCloseTick);state.winCloseTick=null;return;}
+      btn.textContent='CLOSE (auto in '+remain+'s)';
+    },1000);
+    state.winCloseTimer=setTimeout(()=>{
+      clearInterval(state.winCloseTick);state.winCloseTick=null;
+      hideWinner();state.currentlyShowingRoundId=null;
+    },WIN_AUTO_CLOSE_MS);
   }
-  state.currentlyShowingRoundId=r.id;const [{data:winners},{data:allCalls}]=await Promise.all([sb.from('card_pool').select('*').eq('round_id',r.id).eq('won',true).eq('status','paid').order('is_bot',{ascending:true}).order('slot_number',{ascending:true}),sb.from('calls').select('number').eq('round_id',r.id)]);const winnerList=winners||[],calledSet=new Set((allCalls||[]).map(c=>c.number)),count=winnerList.length||1,perWinner=Number(r.winner_prize||0),totalPrize=Number(r.prize_amount||perWinner*count);$('winRoundLine').textContent='ROUND #'+(r.round_number||'—');$('winPatternLine').textContent='Pattern: '+(PATTERN_LABEL[r.pattern]||'Line')+' · '+count+(count===1?' winner':' winners');$('winWinnerName').textContent=count===1?'🏆 '+(winnerList[0]?.user_name||r.winner_name):'🏆 '+count+' Winners';$('winDetails').textContent=count===1?'Card #'+(winnerList[0]?.slot_number||r.winner_slot):'Each receives '+birr(perWinner)+' birr';$('winPrizeBig').textContent=birr(totalPrize)+' birr total';const wrap=$('winCardWrap');wrap.innerHTML='';wrap.style.display='flex';wrap.style.flexWrap='wrap';wrap.style.justifyContent='center';wrap.style.gap='6px';wrap.style.maxHeight='55vh';wrap.style.overflowY='auto';winnerList.forEach(card=>{const c=document.createElement('div');c.className='card';const header=document.createElement('div');header.className='card-header';['B','I','N','G','O'].forEach(L=>{const d=document.createElement('div');d.textContent=L;header.appendChild(d);});c.appendChild(header);const g=document.createElement('div');g.className='grid';const nums=card.numbers,lineIdx=findWinningCells(r.pattern,nums,calledSet);for(let rr=0;rr<5;rr++)for(let cc=0;cc<5;cc++){const idx=rr*5+cc,val=nums[idx],cell=document.createElement('div');cell.className='cell';if(val===0){cell.classList.add('free','hit');cell.textContent='FREE';}else{cell.textContent=val;if(calledSet.has(val))cell.classList.add('hit');}if(lineIdx.includes(idx))cell.classList.add('winline');g.appendChild(cell);}c.appendChild(g);const label=document.createElement('div');label.style.cssText='text-align:center;font-size:.66rem;color:var(--muted);margin-top:4px';label.textContent='🏆 '+(card.user_name||'?')+' · #'+card.slot_number;c.appendChild(label);wrap.appendChild(c);});$('winOverlay').classList.add('show');spawnConfetti();playBingoFanfare();
-  // 🔥 Amharic winner announcement
-  if(state.voiceOn && window.WinnerVoice){
-    WinnerVoice.play().catch(()=>{});
-  }const btn=$('btnWinDismiss');let remain=Math.round(WIN_AUTO_CLOSE_MS/1000);btn.textContent='CLOSE (auto in '+remain+'s)';const tick=setInterval(()=>{remain--;if(remain<=0){clearInterval(tick);return;}btn.textContent='CLOSE (auto in '+remain+'s)';},1000);clearTimeout(state.winCloseTimer);state.winCloseTimer=setTimeout(()=>{clearInterval(tick);hideWinner();state.currentlyShowingRoundId=null;},WIN_AUTO_CLOSE_MS);}
 
 
   /* LOGIN */
@@ -3264,7 +3330,7 @@ window.WinnerVoice=WinnerVoice;
     const timers=['drawTimer','countdownTimer','botCheckTimer','healthTimer',
                   'ensureTimer','reconcileTimer','callPollTimer','resyncTimer',
                   'poolDebounce','ballTimeout','latestTimeout','cornerPopTimeout',
-                  'ball3DTimeout','winCloseTimer'];
+                  'ball3DTimeout','winCloseTimer','winCloseTick'];
     timers.forEach(k=>{
       if(state[k]!=null){
         try{clearTimeout(state[k]);}catch(e){}
@@ -4328,37 +4394,97 @@ window.WinnerVoice=WinnerVoice;
   function updateSelBar(){
     $('selCount').textContent='1';
   }
+  // Wallet forms are mutually exclusive; keep the existing transaction logic intact.
+  document.querySelectorAll('[data-wallet-tab]').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      const which=tab.dataset.walletTab;
+      document.querySelectorAll('[data-wallet-tab]').forEach(t=>{
+        const active=t===tab;t.classList.toggle('active',active);
+        t.setAttribute('aria-selected',active?'true':'false');
+      });
+      $('walletDepositSection').classList.toggle('wallet-hidden',which!=='deposit');
+      $('walletWithdrawSection').classList.toggle('wallet-hidden',which!=='withdraw');
+      $('walletSendStatus').classList.remove('show','done','failed');
+      $('walletMsg').textContent='';
+    });
+  });
+  const copyCBE=$('btnCopyCBE');
+  if(copyCBE)copyCBE.onclick=async()=>{
+    const account='1000657206176';
+    try{
+      if(navigator.clipboard)await navigator.clipboard.writeText(account);
+      else{const ta=document.createElement('textarea');ta.value=account;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();}
+      copyCBE.textContent='Copied ✓';setTimeout(()=>copyCBE.textContent='Copy',1600);
+    }catch(e){setMsg('walletMsg','Copy this CBE account number: '+account,'var(--gold)');}
+  };
+  function walletSendStatus(message,kind){
+    const box=$('walletSendStatus');if(!box)return;
+    box.classList.add('show');box.classList.toggle('done',kind==='done');
+    box.classList.toggle('failed',kind==='failed');
+    const orbit=box.querySelector('.wallet-send-orbit');
+    if(orbit)orbit.style.display=kind==='done'||kind==='failed'?'none':'block';
+    box.querySelector('.wallet-send-message').textContent=message;
+  }
   $('btnDeposit').onclick = async () => {
     const amount = parseFloat($('depositAmount').value);
     const sms = $('depositSms') ? $('depositSms').value.trim() : '';
+    const btn=$('btnDeposit');
 
     if (!amount || amount < MIN_DEPOSIT)
       return setMsg('walletMsg', 'Minimum deposit is ' + MIN_DEPOSIT + ' birr', 'var(--danger)');
     if (!sms || sms.length < 10)
       return setMsg('walletMsg', 'Paste the Telebirr SMS you received after sending', 'var(--danger)');
+    if(!state.user||!state.user.id)
+      return setMsg('walletMsg','Please sign in again before requesting a deposit.','var(--danger)');
+    if(btn.disabled)return;
 
-    setMsg('walletMsg', 'Submitting…', 'var(--accent)');
+    btn.disabled=true;
+    btn.textContent='⏳ SENDING REQUEST…';
+    setMsg('walletMsg','','var(--accent)');
+    walletSendStatus('🔐 Securely sending your deposit request…', 'sending');
+    let timeoutId;
+    try{
+      const result=await Promise.race([
+        sb.rpc('request_deposit', {
+          p_user_id: state.user.id,
+          p_amount: amount,
+          p_reference: null,
+          p_sms_text: sms
+        }),
+        new Promise(resolve=>{timeoutId=setTimeout(()=>resolve({timeout:true}),20000);})
+      ]);
+      clearTimeout(timeoutId);
+      if(result.timeout){
+        walletSendStatus('⚠️ The network is taking too long. We could not confirm the result within 20 seconds. Check Transaction History before trying again to avoid a duplicate request.','failed');
+        return setMsg('walletMsg','Request status unknown due to network delay. Check Transaction History.','var(--danger)');
+      }
+      const {data,error}=result;
+      if(error){
+        walletSendStatus('⚠️ Could not confirm the request. Please check your connection and Transaction History before retrying.','failed');
+        return setMsg('walletMsg','Network/server error: '+error.message,'var(--danger)');
+      }
+      if(!data||!data.ok){
+        const reason=data&&data.reason;
+        let message=reason||'Deposit request could not be submitted.';
+        if(reason==='too_soon')message='Please wait '+((data&&data.wait_seconds)||180)+'s before another deposit.';
+        if(reason==='missing_sms')message='Paste the Telebirr SMS first.';
+        walletSendStatus('❌ '+message,'failed');
+        return setMsg('walletMsg',message,'var(--danger)');
+      }
 
-    const {data, error} = await sb.rpc('request_deposit', {
-      p_user_id: state.user.id,
-      p_amount: amount,
-      p_reference: null,
-      p_sms_text: sms
-    });
-
-    if (error) return setMsg('walletMsg', 'Error: ' + error.message, 'var(--danger)');
-    if (!data.ok) {
-      if (data.reason === 'too_soon')
-        return setMsg('walletMsg', 'Please wait ' + (data.wait_seconds||180) + 's before another deposit.', 'var(--danger)');
-      if (data.reason === 'missing_sms')
-        return setMsg('walletMsg', 'Paste the Telebirr SMS first', 'var(--danger)');
-      return setMsg('walletMsg', data.reason, 'var(--danger)');
+      walletSendStatus('✅ Completed, wait for Admin to approve.','done');
+      setMsg('walletMsg','✅ Completed, wait for Admin to approve.','var(--mark)');
+      $('depositAmount').value='';
+      if($('depositSms'))$('depositSms').value='';
+      await Promise.all([loadUser(),loadWallet()]);
+    }catch(e){
+      clearTimeout(timeoutId);
+      walletSendStatus('⚠️ Connection issue. The request result could not be confirmed. Check Transaction History before retrying.','failed');
+      setMsg('walletMsg','Connection issue: '+(e&&e.message?e.message:'request status unknown')+'. Check Transaction History.','var(--danger)');
+    }finally{
+      btn.disabled=false;
+      btn.textContent='💳 REQUEST DEPOSIT';
     }
-
-    setMsg('walletMsg', '✅ Request sent. Admin will verify and approve.', 'var(--mark)');
-    $('depositAmount').value = '';
-    if ($('depositSms')) $('depositSms').value = '';
-    await Promise.all([loadUser(), loadWallet()]);
   };
   $('btnWithdraw').onclick = async () => {
     const amount = parseFloat($('withdrawAmount').value);
@@ -5511,7 +5637,7 @@ window.WinnerVoice=WinnerVoice;
      Pure visual layer. The actual drawn number always comes from state/backend. */
   const SphereEngine=(function(){
     const reducedMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const MINI_BALL_COUNT=36, MINI_BALLS=[];
+    const MINI_BALL_COUNT=24, MINI_BALLS=[];
     let raf=null,lastT=0,stageEl,sphereEl,innerEl,releaseEl,trailEl,statusEl,frameSkip=0;
     let sequenceRunning=false,queuedNumber=null,initialized=false,activeRoundId=null;
     const letterFor=n=>n<=15?'B':n<=30?'I':n<=45?'N':n<=60?'G':'O';
@@ -5556,9 +5682,9 @@ window.WinnerVoice=WinnerVoice;
       lastT=performance.now();
       frameSkip=0;
       const frame=t=>{
-        // Cap the visual physics loop at ~30 FPS on mobile to reduce CPU/GPU heat.
+        // Cap the visual physics loop at ~20 FPS to reduce mobile CPU/GPU heat.
         const elapsed=t-lastT;
-        if(elapsed>=32){
+        if(elapsed>=50){
           const dt=Math.min(.05,elapsed/1000);
           lastT=t;
           step(dt);
@@ -5589,31 +5715,8 @@ window.WinnerVoice=WinnerVoice;
         }
       }
 
-      // Ball-vs-ball collision is the most expensive part of the visual simulation.
-      // Run it every other visual frame; the balls still move continuously.
-      frameSkip++;
-      if((frameSkip & 1)===0){
-        for (let i = 0; i < MINI_BALLS.length; i++){
-          for (let j = i+1; j < MINI_BALLS.length; j++){
-            const a = MINI_BALLS[i], b = MINI_BALLS[j];
-            const dx = b.x-a.x, dy = b.y-a.y, dz = b.z-a.z;
-            const d2 = dx*dx + dy*dy + dz*dz;
-            const minD = a.r + b.r;
-            if (d2 < minD*minD && d2 > 1e-6){
-              const d = Math.sqrt(d2);
-              const nx = dx/d, ny = dy/d, nz = dz/d;
-              const push = (minD - d) * 0.5;
-              a.x -= nx*push; a.y -= ny*push; a.z -= nz*push;
-              b.x += nx*push; b.y += ny*push; b.z += nz*push;
-              const vn = (b.vx-a.vx)*nx + (b.vy-a.vy)*ny + (b.vz-a.vz)*nz;
-              if (vn < 0){
-                a.vx += nx*vn; a.vy += ny*vn; a.vz += nz*vn;
-                b.vx -= nx*vn; b.vy -= ny*vn; b.vz -= nz*vn;
-              }
-            }
-          }
-        }
-      }
+      // Skip ball-vs-ball collision checks on mobile; wall bounces and depth motion
+      // preserve a convincing moving-ball effect at a fraction of the CPU cost.
 
       // Keep the sphere completely stationary. Only the balls move and collide.
       // Apply one fixed tilt for the glass perspective; there is no continuous sphere rotation.
